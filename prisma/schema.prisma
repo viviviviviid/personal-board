@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  description String?  @db.Text
+  color       String   @default("#6366f1")
+  goal        String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  todos       Todo[]
+  sections    ProjectSection[]
+}
+
+model ProjectSection {
+  id        String   @id @default(cuid())
+  title     String
+  isOpen    Boolean  @default(true)
+  order     Int      @default(0)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  todos     Todo[]
+}
+
+model Todo {
+  id          String        @id @default(cuid())
+  title       String
+  description String?       @db.Text
+  completed   Boolean       @default(false)
+  priority    String        @default("medium")
+  date        DateTime?
+  projectId   String?
+  project     Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  sectionId   String?
+  section     ProjectSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model TimelineEntry {
+  id          String   @id @default(cuid())
+  date        DateTime @db.Date
+  startTime   String
+  endTime     String?
+  title       String
+  description String?  @db.Text
+  category    String?
+  createdAt   DateTime @default(now())
+}
+
+model Habit {
+  id        String      @id @default(cuid())
+  name      String
+  emoji     String?
+  color     String      @default("#10b981")
+  createdAt DateTime    @default(now())
+  logs      HabitLog[]
+}
+
+model HabitLog {
+  id        String   @id @default(cuid())
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([habitId, date])
+}
