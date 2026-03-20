@@ -171,15 +171,15 @@ export default function HabitsPage() {
           </button>
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-all ml-2"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-all ml-1"
             style={{
               background: showAddForm ? 'var(--bg-card)' : 'var(--accent-dim)',
               border: '1px solid var(--border)',
               color: showAddForm ? 'var(--text-muted)' : 'var(--accent-light)',
             }}
           >
-            {showAddForm ? <X size={16} /> : <Plus size={16} />}
-            {showAddForm ? '닫기' : '새 습관'}
+            {showAddForm ? <X size={15} /> : <Plus size={15} />}
+            <span className="hidden sm:inline">{showAddForm ? '닫기' : '새 습관'}</span>
           </button>
         </div>
       </div>

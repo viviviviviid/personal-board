@@ -20,37 +20,41 @@ export default function Sidebar() {
 
   return (
     <aside
-      className="fixed left-0 top-0 h-full flex flex-col z-50 transition-all duration-200"
+      className="hidden md:flex fixed left-0 top-0 h-full flex-col z-50 transition-all duration-200"
       style={{
         width: isCollapsed ? 48 : 240,
         background: 'var(--bg-surface)',
         borderRight: '1px solid var(--border-dim)',
       }}
     >
-      {/* Branding */}
+      {/* 상단 토글 버튼 */}
       <div
-        className="px-3 py-5 flex items-center transition-all duration-200"
-        style={{ borderBottom: '1px solid var(--border-dim)', gap: isCollapsed ? 0 : 12 }}
+        className="flex items-center px-2 py-2"
+        style={{
+          borderBottom: '1px solid var(--border-dim)',
+          justifyContent: isCollapsed ? 'center' : 'flex-end',
+        }}
       >
-        <div
-          className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-lg"
-          style={{ background: 'var(--bg-hover)', border: '1px solid var(--border)' }}
+        <button
+          onClick={toggle}
+          className="p-1.5 rounded-lg transition-all"
+          style={{
+            background: 'transparent',
+            border: '1px solid transparent',
+            color: 'var(--text-dim)',
+          }}
+          title={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'var(--bg-hover)'
+            e.currentTarget.style.borderColor = 'var(--border-dim)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.borderColor = 'transparent'
+          }}
         >
-          📓
-        </div>
-        {!isCollapsed && (
-          <div>
-            <h1
-              className="font-hand text-xl leading-tight"
-              style={{ color: 'var(--accent-light)' }}
-            >
-              My Dashboard
-            </h1>
-            <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-dim)' }}>
-              생산성 노트
-            </p>
-          </div>
-        )}
+          {isCollapsed ? <ChevronRight size={15} /> : <ChevronLeft size={15} />}
+        </button>
       </div>
 
       {/* Navigation */}
@@ -154,19 +158,6 @@ export default function Sidebar() {
           </div>
         )}
 
-        {/* Collapse toggle */}
-        <button
-          onClick={toggle}
-          className="w-full flex items-center justify-center p-1.5 rounded-lg transition-all"
-          style={{
-            background: 'var(--bg-hover)',
-            border: '1px solid var(--border-dim)',
-            color: 'var(--text-dim)',
-          }}
-          title={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-        >
-          {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-        </button>
       </div>
     </aside>
   )

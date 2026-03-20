@@ -86,10 +86,11 @@ export default function ProjectsPage() {
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-all"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-all"
           style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent)', color: 'var(--accent-light)' }}
         >
-          <Plus size={16} />새 프로젝트
+          <Plus size={15} />
+          <span className="hidden sm:inline">새 프로젝트</span>
         </button>
       </div>
 
@@ -103,7 +104,7 @@ export default function ProjectsPage() {
       )}
 
       {loading ? (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
@@ -126,7 +127,7 @@ export default function ProjectsPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {projects.map((project) => {
             const progress = project.totalTodos > 0
               ? Math.round((project.completedTodos / project.totalTodos) * 100)

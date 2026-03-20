@@ -73,23 +73,75 @@ const PRIORITY_COLOR: Record<string, string> = {
   low: '#A1A1AA',
 }
 
+// ── Overlap layout ─────────────────────────────────────────────────────────
+function computeOverlapLayout(
+  items: Array<{ id: string; start: string; end: string }>
+): Map<string, { col: number; total: number }> {
+  const result = new Map<string, { col: number; total: number }>()
+  if (items.length === 0) return result
+
+  const sorted = [...items].sort((a, b) => a.start.localeCompare(b.start))
+
+  let i = 0
+  while (i < sorted.length) {
+    let groupEnd = sorted[i].end
+    let j = i + 1
+    while (j < sorted.length && sorted[j].start < groupEnd) {
+      if (sorted[j].end > groupEnd) groupEnd = sorted[j].end
+      j++
+    }
+    const group = sorted.slice(i, j)
+
+    const colEnds: string[] = []
+    const colAssignments: number[] = []
+    for (const item of group) {
+      let placed = -1
+      for (let col = 0; col < colEnds.length; col++) {
+        if (colEnds[col] <= item.start) {
+          colEnds[col] = item.end
+          placed = col
+          break
+        }
+      }
+      if (placed === -1) {
+        placed = colEnds.length
+        colEnds.push(item.end)
+      }
+      colAssignments.push(placed)
+    }
+
+    const total = colEnds.length
+    group.forEach((item, idx) => result.set(item.id, { col: colAssignments[idx], total }))
+    i = j
+  }
+
+  return result
+}
+
 // ── Entry block ────────────────────────────────────────────────────────────
 interface EntryBlockProps {
   entry: TimelineEntry
   onDelete: () => void
   onDragStart: (e: React.MouseEvent, type: 'move' | 'resize') => void
+  layoutCol?: number
+  layoutTotal?: number
 }
 
-function EntryBlock({ entry, onDelete, onDragStart }: EntryBlockProps) {
+function EntryBlock({ entry, onDelete, onDragStart, layoutCol = 0, layoutTotal = 1 }: EntryBlockProps) {
   const top = timeToY(entry.startTime)
   const effEnd = entry.endTime || addOneHour(entry.startTime)
   const height = Math.max(20, timeToY(effEnd) - top)
   const s = CAT_STYLE[entry.category || ''] ?? DEF_STYLE
 
+  const GAP = 2
+  const pct = 100 / layoutTotal
+  const colLeft = `calc(${layoutCol * pct}% + ${GAP}px)`
+  const colWidth = `calc(${pct}% - ${GAP * 2}px)`
+
   return (
     <div
       style={{
-        position: 'absolute', top, left: 3, right: 3, height, zIndex: 10,
+        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 10,
         background: s.bg, border: `1px solid ${s.border}`, color: s.text,
         borderRadius: 6,
       }}
@@ -124,17 +176,22 @@ function EntryBlock({ entry, onDelete, onDragStart }: EntryBlockProps) {
 }
 
 // ── Google Event block ──────────────────────────────────────────────────────
-function GoogleEventBlock({ event }: { event: GoogleCalendarEvent }) {
+function GoogleEventBlock({ event, layoutCol = 0, layoutTotal = 1 }: { event: GoogleCalendarEvent; layoutCol?: number; layoutTotal?: number }) {
   const startTime = format(new Date(event.start.dateTime), 'HH:mm')
   const endTime = format(new Date(event.end.dateTime), 'HH:mm')
   const top = timeToY(startTime)
   const height = Math.max(20, timeToY(endTime) - top)
   const color = event.calendarColor ?? '#4285F4'
 
+  const GAP = 2
+  const pct = 100 / layoutTotal
+  const colLeft = `calc(${layoutCol * pct}% + ${GAP}px)`
+  const colWidth = `calc(${pct}% - ${GAP * 2}px)`
+
   return (
     <div
       style={{
-        position: 'absolute', top, left: 3, right: 3, height, zIndex: 9,
+        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 9,
         background: `${color}33`,
         border: `1px solid ${color}88`,
         color,
@@ -172,10 +229,18 @@ export default function WeeklyBoard() {
   const [monthlyEnabledCals, setMonthlyEnabledCals] = useState<Set<string>>(new Set())
   const [highlights, setHighlights] = useState<DailyHighlight[]>([])
   const [calPanelOpen, setCalPanelOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  const [mobileDay, setMobileDay] = useState(() => {
+    const today = new Date().getDay()
+    // 월요일=0 ... 일요일=6
+    return today === 0 ? 6 : today - 1
+  })
   const [calStatus, setCalStatus] = useState<'loading' | 'ok' | 'no_token' | 'error'>('loading')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(new Date())
+
+  const [slideDir, setSlideDir] = useState<'next' | 'prev' | null>(null)
 
   const [addingTodoDay, setAddingTodoDay] = useState<string | null>(null)
   const [newTodoTitle, setNewTodoTitle] = useState('')
@@ -264,18 +329,31 @@ export default function WeeklyBoard() {
     return () => clearInterval(t)
   }, [])
 
+  // 모바일 감지
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  const navigateWeek = useCallback((dir: 'next' | 'prev') => {
+    setSlideDir(dir)
+    setCurrentWeekStart(d => dir === 'next' ? addWeeks(d, 1) : subWeeks(d, 1))
+  }, [])
+
   // 좌우 화살표 키로 주 이동
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (view !== 'weekly' && view !== 'matrix') return
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      if (e.key === 'ArrowLeft') setCurrentWeekStart(d => subWeeks(d, 1))
-      if (e.key === 'ArrowRight') setCurrentWeekStart(d => addWeeks(d, 1))
+      if (e.key === 'ArrowLeft') navigateWeek('prev')
+      if (e.key === 'ArrowRight') navigateWeek('next')
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [view])
+  }, [view, navigateWeek])
 
   const dragRef = useRef<{
     type: 'move' | 'resize'
@@ -339,6 +417,18 @@ export default function WeeklyBoard() {
   useEffect(() => { fetchData() }, [fetchData])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
+  const moveTodo = async (id: string, urgent: boolean, important: boolean) => {
+    const todo = todos.find(t => t.id === id)
+    if (!todo) return
+    const newPriority = important ? 'high' : todo.priority === 'high' ? 'medium' : todo.priority
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, urgent, priority: newPriority } : t))
+    await fetch(`/api/todos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urgent, priority: newPriority }),
+    }).catch(() => fetchData())
+  }
+
   const toggleUrgent = async (id: string, urgent: boolean) => {
     setTodos(prev => prev.map(t => t.id === id ? { ...t, urgent: !urgent } : t))
     await fetch(`/api/todos/${id}`, {
@@ -525,225 +615,173 @@ export default function WeeklyBoard() {
     : `${format(currentMonth, 'yyyy.MM')} — ${format(addMonths(currentMonth, monthCount - 1), 'yyyy.MM')}`
   const nowY = nowToY(now)
   const gridCols = `44px repeat(7, minmax(0, 1fr))`
+  const visibleDays = isMobile ? [weekDays[mobileDay]] : weekDays
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
-        <div>
-          <h1 className="text-lg font-bold" style={{ color: 'var(--text-bright)' }}>
-            {view === 'weekly' ? '주간 보드' : view === 'monthly' ? '월간 캘린더' : '매트릭스'}
-          </h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
-            {view === 'weekly' ? weekLabel : view === 'monthly' ? monthLabel : '긴급/중요 우선순위'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div
-            className="flex rounded-lg overflow-hidden"
-            style={{ border: '1px solid var(--border)' }}
-          >
-            {(['weekly', 'monthly', 'matrix'] as const).map((v, i) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className="px-2.5 py-1 text-xs transition-all"
-                style={{
-                  background: view === v ? 'var(--accent-dim)' : 'var(--bg-card)',
-                  color: view === v ? 'var(--accent-light)' : 'var(--text-muted)',
-                  borderRight: i < 2 ? '1px solid var(--border)' : 'none',
-                }}
-              >
-                {v === 'weekly' ? '주간' : v === 'monthly' ? '월간' : '매트릭스'}
-              </button>
-            ))}
+      {/* Header — 2-row layout */}
+      <div className="flex flex-col gap-2 mb-3 flex-shrink-0">
+
+        {/* Row 1: Title + view toggle + icon buttons */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="text-base font-bold truncate" style={{ color: 'var(--text-bright)' }}>
+              {view === 'weekly' ? '주간 보드' : view === 'monthly' ? '월간 캘린더' : '매트릭스'}
+            </h1>
+            <p className="text-xs" style={{ color: 'var(--text-dim)' }}>
+              {view === 'weekly' ? weekLabel : view === 'monthly' ? monthLabel : '긴급/중요 우선순위'}
+            </p>
           </div>
-          {/* 포모도로 타이머 */}
-          <PomodoroTimer />
-
-          {/* Google Calendar 버튼 — 주간/월간 공통 */}
-          <div style={{ position: 'relative' }} data-cal-panel>
-                {/* 연결 안됨 or 에러 */}
-                {(calStatus === 'no_token' || calStatus === 'error') && (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* View toggle */}
+            <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+              {(['weekly', 'monthly', 'matrix'] as const).map((v, i) => (
+                <button
+                  key={v}
+                  onClick={() => setView(v)}
+                  className="px-2 py-1 text-xs transition-all"
+                  style={{
+                    background: view === v ? 'var(--accent-dim)' : 'var(--bg-card)',
+                    color: view === v ? 'var(--accent-light)' : 'var(--text-muted)',
+                    borderRight: i < 2 ? '1px solid var(--border)' : 'none',
+                  }}
+                >
+                  {isMobile
+                    ? (v === 'weekly' ? '주' : v === 'monthly' ? '월' : '매')
+                    : (v === 'weekly' ? '주간' : v === 'monthly' ? '월간' : '매트릭스')}
+                </button>
+              ))}
+            </div>
+            {/* 포모도로 타이머 */}
+            <PomodoroTimer />
+            {/* Google Calendar 버튼 */}
+            <div style={{ position: 'relative' }} data-cal-panel>
+              {(calStatus === 'no_token' || calStatus === 'error') && (
+                <button
+                  onClick={() => signIn('google', { callbackUrl: '/' })}
+                  className="p-1.5 rounded-lg transition-all flex items-center gap-1.5 text-[11px]"
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}
+                  title="Google Calendar 연결"
+                >
+                  <Unlink size={13} />
+                  {!isMobile && <span>캘린더 연결</span>}
+                </button>
+              )}
+              {calStatus === 'loading' && (
+                <div className="p-1.5 rounded-lg" style={{ border: '1px solid var(--border-dim)', color: 'var(--text-dim)' }}>
+                  <CalendarDays size={14} className="opacity-40" />
+                </div>
+              )}
+              {calStatus === 'ok' && (
+                <>
                   <button
-                    onClick={() => signIn('google', { callbackUrl: '/' })}
-                    className="p-1.5 rounded-lg transition-all flex items-center gap-1.5 text-[11px]"
+                    onClick={() => setCalPanelOpen(v => !v)}
+                    className="p-1.5 rounded-lg transition-all"
                     style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text-dim)',
+                      background: calPanelOpen ? 'var(--accent-dim)' : 'var(--bg-card)',
+                      border: `1px solid ${calPanelOpen ? 'var(--accent)' : 'var(--border)'}`,
+                      color: calPanelOpen ? 'var(--accent-light)' : 'var(--text-muted)',
                     }}
-                    title="Google Calendar 연결"
+                    title="Google Calendar"
                   >
-                    <Unlink size={13} />
-                    <span>캘린더 연결</span>
+                    <CalendarDays size={14} />
                   </button>
-                )}
-
-                {/* 로딩 중 */}
-                {calStatus === 'loading' && (
-                  <div
-                    className="p-1.5 rounded-lg flex items-center gap-1"
-                    style={{ border: '1px solid var(--border-dim)', color: 'var(--text-dim)' }}
-                  >
-                    <CalendarDays size={14} className="opacity-40" />
-                  </div>
-                )}
-
-                {/* 연결됨 */}
-                {calStatus === 'ok' && (
-                  <>
-                    <button
-                      onClick={() => setCalPanelOpen(v => !v)}
-                      className="p-1.5 rounded-lg transition-all flex items-center gap-1.5"
+                  {calPanelOpen && (
+                    <div
                       style={{
-                        background: calPanelOpen ? 'var(--accent-dim)' : 'var(--bg-card)',
-                        border: `1px solid ${calPanelOpen ? 'var(--accent)' : 'var(--border)'}`,
-                        color: calPanelOpen ? 'var(--accent-light)' : 'var(--text-muted)',
+                        position: 'fixed',
+                        top: isMobile ? 'auto' : undefined,
+                        bottom: isMobile ? 80 : undefined,
+                        right: isMobile ? 8 : 0,
+                        marginTop: isMobile ? 0 : 6,
+                        background: 'var(--bg-surface)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 12, padding: '8px 4px',
+                        width: isMobile ? 'calc(100vw - 16px)' : 260,
+                        zIndex: 200,
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
                       }}
-                      title="Google Calendar"
                     >
-                      <CalendarDays size={14} />
-                    </button>
-
-                    {calPanelOpen && (
-                      <div
-                        style={{
-                          position: 'absolute', top: '100%', right: 0, marginTop: 6,
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 12, padding: '8px 4px',
-                          minWidth: 260, zIndex: 100,
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                        }}
-                      >
-                        {/* 패널 헤더 */}
-                        <div className="px-3 pb-1.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-dim)', marginBottom: 4 }}>
-                          <span className="text-[10px] font-semibold tracking-wide" style={{ color: 'var(--text-dim)' }}>
-                            GOOGLE CALENDAR
+                      <div className="px-3 pb-1.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-dim)', marginBottom: 4 }}>
+                        <span className="text-[10px] font-semibold tracking-wide" style={{ color: 'var(--text-dim)' }}>GOOGLE CALENDAR</span>
+                        <button
+                          onClick={() => { fetchCalendarList(); setCalPanelOpen(false) }}
+                          className="p-0.5 rounded"
+                          style={{ color: 'var(--text-dim)' }}
+                          title="새로고침"
+                        >
+                          <RefreshCw size={11} />
+                        </button>
+                      </div>
+                      <div className="flex items-center px-3 pb-1 mb-1" style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                        <span className="flex-1 text-[10px]" style={{ color: 'var(--text-dim)' }} />
+                        <span className="w-7 text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>주</span>
+                        <span className="w-7 text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>월</span>
+                      </div>
+                      {calendarList.map(cal => (
+                        <div
+                          key={cal.id}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                          style={{ background: 'transparent' }}
+                        >
+                          <div style={{ width: 9, height: 9, borderRadius: '50%', flexShrink: 0, background: cal.backgroundColor }} />
+                          <span className="text-[12px] truncate flex-1" style={{ color: 'var(--text)' }}>
+                            {cal.summary}
+                            {cal.primary && <span className="ml-1 text-[9px]" style={{ color: 'var(--text-dim)' }}>기본</span>}
                           </span>
-                          <button
-                            onClick={() => { fetchCalendarList(); setCalPanelOpen(false) }}
-                            className="p-0.5 rounded transition-all"
-                            style={{ color: 'var(--text-dim)' }}
-                            title="새로고침"
-                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
-                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
-                          >
-                            <RefreshCw size={11} />
+                          <button onClick={() => toggleCalendarWeekly(cal.id)} className="w-7 flex items-center justify-center" title="주간에 표시">
+                            <div style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, background: weeklyEnabledCals.has(cal.id) ? cal.backgroundColor : 'transparent', border: `2px solid ${weeklyEnabledCals.has(cal.id) ? cal.backgroundColor : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {weeklyEnabledCals.has(cal.id) && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </div>
+                          </button>
+                          <button onClick={() => toggleCalendarMonthly(cal.id)} className="w-7 flex items-center justify-center" title="월간에 표시">
+                            <div style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, background: monthlyEnabledCals.has(cal.id) ? cal.backgroundColor : 'transparent', border: `2px solid ${monthlyEnabledCals.has(cal.id) ? cal.backgroundColor : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {monthlyEnabledCals.has(cal.id) && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            </div>
                           </button>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
 
-                        {/* 열 라벨 */}
-                        <div className="flex items-center px-3 pb-1 mb-1" style={{ borderBottom: '1px solid var(--border-dim)' }}>
-                          <span className="flex-1 text-[10px]" style={{ color: 'var(--text-dim)' }} />
-                          <span className="w-7 text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>주</span>
-                          <span className="w-7 text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>월</span>
-                        </div>
-
-                        {/* 캘린더 목록 */}
-                        {calendarList.map(cal => (
-                          <div
-                            key={cal.id}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-                            style={{ background: 'transparent' }}
-                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                          >
-                            <div
-                              style={{
-                                width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
-                                background: cal.backgroundColor,
-                              }}
-                            />
-                            <span className="text-[12px] truncate flex-1" style={{ color: 'var(--text)' }}>
-                              {cal.summary}
-                              {cal.primary && (
-                                <span className="ml-1 text-[9px]" style={{ color: 'var(--text-dim)' }}>기본</span>
-                              )}
-                            </span>
-                            {/* 주간 체크박스 */}
-                            <button
-                              onClick={() => toggleCalendarWeekly(cal.id)}
-                              className="w-7 flex items-center justify-center"
-                              title="주간에 표시"
-                            >
-                              <div style={{
-                                width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                                background: weeklyEnabledCals.has(cal.id) ? cal.backgroundColor : 'transparent',
-                                border: `2px solid ${weeklyEnabledCals.has(cal.id) ? cal.backgroundColor : 'var(--border)'}`,
-                                transition: 'all 0.15s',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              }}>
-                                {weeklyEnabledCals.has(cal.id) && (
-                                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                                    <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
-                                )}
-                              </div>
-                            </button>
-                            {/* 월간 체크박스 */}
-                            <button
-                              onClick={() => toggleCalendarMonthly(cal.id)}
-                              className="w-7 flex items-center justify-center"
-                              title="월간에 표시"
-                            >
-                              <div style={{
-                                width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                                background: monthlyEnabledCals.has(cal.id) ? cal.backgroundColor : 'transparent',
-                                border: `2px solid ${monthlyEnabledCals.has(cal.id) ? cal.backgroundColor : 'var(--border)'}`,
-                                transition: 'all 0.15s',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              }}>
-                                {monthlyEnabledCals.has(cal.id) && (
-                                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                                    <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
-                                )}
-                              </div>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-          {(view === 'weekly' || view === 'matrix') ? (
-            <>
-              <button
-                onClick={() => setCurrentWeekStart(d => subWeeks(d, 1))}
-                className="p-1.5 rounded-lg transition-all"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-              >
-                <ChevronLeft size={15} />
-              </button>
-              <button
-                onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-                className="px-2.5 py-1 text-xs rounded-lg transition-all"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-              >
-                이번 주
-              </button>
-              <button
-                onClick={() => setCurrentWeekStart(d => addWeeks(d, 1))}
-                className="p-1.5 rounded-lg transition-all"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-              >
-                <ChevronRight size={15} />
-              </button>
-              {view === 'weekly' && <AIFeedback weekStart={currentWeekStart} />}
-            </>
-          ) : (
-            <>
-              {/* Month count selector */}
-              <div
-                className="flex rounded-lg overflow-hidden"
-                style={{ border: '1px solid var(--border)' }}
-              >
+        {/* Row 2: Navigation */}
+        {(view === 'weekly' || view === 'matrix') && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => navigateWeek('prev')}
+              className="p-1.5 rounded-lg transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <button
+              onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+              className="px-2.5 py-1 text-xs rounded-lg transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+            >
+              이번 주
+            </button>
+            <button
+              onClick={() => navigateWeek('next')}
+              className="p-1.5 rounded-lg transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+            >
+              <ChevronRight size={15} />
+            </button>
+            {!isMobile && view === 'weekly' && <AIFeedback weekStart={currentWeekStart} />}
+          </div>
+        )}
+        {view === 'monthly' && (
+          <div className="flex items-center gap-1.5">
+            {!isMobile && (
+              <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
                 {([1, 2, 3] as const).map((n, i) => (
                   <button
                     key={n}
@@ -759,30 +797,30 @@ export default function WeeklyBoard() {
                   </button>
                 ))}
               </div>
-              <button
-                onClick={() => setCurrentMonth(d => subMonths(d, 1))}
-                className="p-1.5 rounded-lg transition-all"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-              >
-                <ChevronLeft size={15} />
-              </button>
-              <button
-                onClick={() => setCurrentMonth(startOfMonth(new Date()))}
-                className="px-2.5 py-1 text-xs rounded-lg transition-all"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-              >
-                이번 달
-              </button>
-              <button
-                onClick={() => setCurrentMonth(d => addMonths(d, 1))}
-                className="p-1.5 rounded-lg transition-all"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-              >
-                <ChevronRight size={15} />
-              </button>
-            </>
-          )}
-        </div>
+            )}
+            <button
+              onClick={() => setCurrentMonth(d => subMonths(d, 1))}
+              className="p-1.5 rounded-lg transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <button
+              onClick={() => setCurrentMonth(startOfMonth(new Date()))}
+              className="px-2.5 py-1 text-xs rounded-lg transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+            >
+              이번 달
+            </button>
+            <button
+              onClick={() => setCurrentMonth(d => addMonths(d, 1))}
+              className="p-1.5 rounded-lg transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── 매트릭스 뷰 ────────────────────────────────────────────────────── */}
@@ -793,6 +831,8 @@ export default function WeeklyBoard() {
           onToggle={toggleTodo}
           onToggleUrgent={toggleUrgent}
           onDelete={deleteTodo}
+          onMove={moveTodo}
+          isMobile={isMobile}
         />
       )}
 
@@ -803,6 +843,41 @@ export default function WeeklyBoard() {
           enabledCalendars={monthlyEnabledCals}
           calendarList={calendarList}
         />
+      )}
+
+      {/* 모바일 날짜 탭 */}
+      {view === 'weekly' && isMobile && (
+        <div className="flex gap-1 mb-3 overflow-x-auto flex-shrink-0">
+          {weekDays.map((day, i) => {
+            const today = isToday(day)
+            const isSelected = mobileDay === i
+            return (
+              <button
+                key={i}
+                onClick={() => setMobileDay(i)}
+                className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl flex-shrink-0 transition-all"
+                style={{
+                  background: isSelected ? 'var(--accent-dim)' : today ? 'rgba(139,92,246,0.06)' : 'var(--bg-card)',
+                  border: `1px solid ${isSelected ? 'var(--accent)' : today ? 'rgba(139,92,246,0.3)' : 'var(--border)'}`,
+                  minWidth: 48,
+                }}
+              >
+                <span
+                  className="text-[10px] font-semibold"
+                  style={{ color: isSelected ? 'var(--accent-light)' : today ? 'var(--accent)' : 'var(--text-dim)' }}
+                >
+                  {DAYS_KO[i]}
+                </span>
+                <span
+                  className="text-lg font-bold leading-none"
+                  style={{ color: isSelected ? 'var(--accent-light)' : today ? 'var(--accent-light)' : 'var(--text-bright)' }}
+                >
+                  {format(day, 'd')}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       )}
 
       {view === 'weekly' && error && (
@@ -816,21 +891,28 @@ export default function WeeklyBoard() {
 
       {/* Grid */}
       {view === 'weekly' && <div
-        className="flex-1 overflow-auto rounded-xl"
+        key={currentWeekStart.toISOString()}
+        className={`flex-1 overflow-auto rounded-xl${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
         style={{ minWidth: 0, border: '1px solid var(--border)' }}
+        onAnimationEnd={() => setSlideDir(null)}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: gridCols, minWidth: '760px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '44px 1fr' : gridCols,
+          minWidth: isMobile ? 0 : '760px',
+        }}>
 
           {/* ── Day headers (sticky) ── */}
           <div
             className="sticky top-0 z-30"
             style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}
           />
-          {weekDays.map((day, i) => {
+          {visibleDays.map((day) => {
+            const wi = weekDays.indexOf(day)
             const today = isToday(day)
             return (
               <div
-                key={i}
+                key={wi}
                 className="sticky top-0 z-30 px-2 py-2"
                 style={{
                   background: today ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-surface)',
@@ -840,9 +922,9 @@ export default function WeeklyBoard() {
               >
                 <div
                   className="text-[11px] font-semibold tracking-wide"
-                  style={{ color: today ? 'var(--accent)' : i >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}
+                  style={{ color: today ? 'var(--accent)' : wi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}
                 >
-                  {DAYS_KO[i]}
+                  {DAYS_KO[wi]}
                 </div>
                 <div
                   className="text-xl font-bold leading-tight"
@@ -862,13 +944,13 @@ export default function WeeklyBoard() {
           >
             <span className="text-[9px] tracking-widest font-semibold" style={{ color: '#ca8a04' }}>★</span>
           </div>
-          {weekDays.map((day, i) => {
+          {visibleDays.map((day) => {
             const dayKey = format(day, 'yyyy-MM-dd')
             const h = highlights.find(x => x.date === dayKey)
             const today = isToday(day)
             return (
               <HighlightCell
-                key={`hl-${i}`}
+                key={`hl-${dayKey}`}
                 day={day}
                 dayKey={dayKey}
                 highlight={h}
@@ -887,78 +969,109 @@ export default function WeeklyBoard() {
           >
             <span className="text-[9px] tracking-widest font-semibold" style={{ color: 'var(--text-dim)' }}>TO-DO</span>
           </div>
-          {weekDays.map((day, i) => {
+          {visibleDays.map((day) => {
+            const wi = weekDays.indexOf(day)
             const dayKey = format(day, 'yyyy-MM-dd')
             const dayTodos = todosForDay(day)
             const isAdding = addingTodoDay === dayKey
             const today = isToday(day)
             return (
               <div
-                key={i}
+                key={wi}
                 className="p-1.5"
                 style={{
                   background: today ? 'rgba(139, 92, 246, 0.05)' : 'var(--bg-card)',
                   borderLeft: '1px solid var(--border)',
                   borderBottom: '1px solid var(--border)',
-                  minHeight: 80,
+                  minHeight: 100,
                 }}
               >
                 {loading ? (
                   <div className="text-center pt-5" style={{ color: 'var(--border)' }}>···</div>
                 ) : (
-                  <div className="space-y-0.5">
+                  <div className="space-y-1">
                     {dayTodos.map(todo => (
                       <div
                         key={todo.id}
-                        className="flex items-start gap-1 group px-0.5 py-0.5 rounded transition-colors"
-                        style={{ '--hover-bg': 'var(--bg-hover)' } as React.CSSProperties}
+                        className="flex items-center gap-1.5 group px-1.5 py-1.5 rounded-lg transition-colors"
+                        style={{ cursor: 'default' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                       >
+                        {/* 체크박스 */}
                         <button
                           onClick={() => toggleTodo(todo.id, todo.completed)}
-                          className="mt-[2px] w-3.5 h-3.5 rounded-sm flex-shrink-0 flex items-center justify-center transition-all"
+                          className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center transition-all"
                           style={{
                             background: todo.completed ? 'var(--accent-dim)' : 'transparent',
-                            border: `1px solid ${todo.completed ? 'var(--accent)' : 'var(--border)'}`,
+                            border: `1.5px solid ${todo.completed ? 'var(--accent)' : 'var(--border)'}`,
+                            cursor: 'pointer',
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.borderColor = 'var(--accent)'
+                            e.currentTarget.style.background = todo.completed ? 'var(--accent)' : 'var(--accent-dim)'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.borderColor = todo.completed ? 'var(--accent)' : 'var(--border)'
+                            e.currentTarget.style.background = todo.completed ? 'var(--accent-dim)' : 'transparent'
                           }}
                         >
-                          {todo.completed && <Check size={8} style={{ color: 'var(--accent-light)' }} />}
+                          {todo.completed && <Check size={10} style={{ color: 'var(--accent-light)' }} />}
                         </button>
-                        {/* Priority dot */}
+                        {/* 우선순위 점 */}
                         <div
-                          className="mt-[5px] w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          className="w-2 h-2 rounded-full flex-shrink-0"
                           style={{
                             background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium,
                             opacity: todo.completed ? 0.3 : 0.8,
                           }}
                         />
                         <span
-                          className="text-[11px] leading-4 flex-1 min-w-0 break-words"
+                          className="text-[12px] leading-snug flex-1 min-w-0 break-words"
                           style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
                         >
                           {todo.title}
                         </span>
-                        {/* urgent toggle */}
+                        {/* 긴급 버튼 */}
                         <button
                           onClick={() => toggleUrgent(todo.id, todo.urgent)}
-                          className={`flex-shrink-0 mt-[1px] transition-all ${todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
-                          style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)' }}
+                          className={`flex-shrink-0 p-0.5 rounded transition-all ${todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
+                          style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)', cursor: 'pointer' }}
                           title={todo.urgent ? '긴급 해제' : '긴급 표시'}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.color = '#ef4444'
+                            e.currentTarget.style.background = 'rgba(239,68,68,0.12)'
+                            e.currentTarget.style.opacity = '1'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.color = todo.urgent ? '#ef4444' : 'var(--text-dim)'
+                            e.currentTarget.style.background = 'transparent'
+                          }}
                         >
-                          <AlertCircle size={9} />
+                          <AlertCircle size={13} />
                         </button>
+                        {/* 삭제 버튼 */}
                         <button
                           onClick={() => deleteTodo(todo.id)}
-                          className="opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 mt-[2px]"
-                          style={{ color: 'var(--text-dim)' }}
+                          className="opacity-0 group-hover:opacity-70 transition-all flex-shrink-0 p-0.5 rounded"
+                          style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
+                          title="삭제"
+                          onMouseEnter={e => {
+                            e.currentTarget.style.color = '#ef4444'
+                            e.currentTarget.style.background = 'rgba(239,68,68,0.12)'
+                            e.currentTarget.style.opacity = '1'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.color = 'var(--text-dim)'
+                            e.currentTarget.style.background = 'transparent'
+                          }}
                         >
-                          <X size={9} />
+                          <X size={13} />
                         </button>
                       </div>
                     ))}
                     {isAdding ? (
-                      <div className="flex items-center gap-1 pt-0.5">
+                      <div className="flex items-center gap-1.5 px-1">
                         <input
                           type="text"
                           value={newTodoTitle}
@@ -968,7 +1081,7 @@ export default function WeeklyBoard() {
                             if (e.key === 'Escape') { setAddingTodoDay(null); setNewTodoTitle('') }
                           }}
                           placeholder="할일..."
-                          className="flex-1 min-w-0 text-[11px] focus:outline-none rounded px-1.5 py-0.5"
+                          className="flex-1 min-w-0 text-[12px] focus:outline-none rounded px-2 py-1"
                           style={{
                             background: 'var(--bg-input)',
                             border: '1px solid var(--accent-dim)',
@@ -976,18 +1089,34 @@ export default function WeeklyBoard() {
                           }}
                           autoFocus
                         />
-                        <button onClick={() => submitTodo(day)} style={{ color: 'var(--accent)' }}><Check size={11} /></button>
-                        <button onClick={() => { setAddingTodoDay(null); setNewTodoTitle('') }} style={{ color: 'var(--text-dim)' }}><X size={11} /></button>
+                        <button
+                          onClick={() => submitTodo(day)}
+                          className="p-1 rounded transition-all"
+                          style={{ color: 'var(--accent)', cursor: 'pointer' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-dim)' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                        >
+                          <Check size={13} />
+                        </button>
+                        <button
+                          onClick={() => { setAddingTodoDay(null); setNewTodoTitle('') }}
+                          className="p-1 rounded transition-all"
+                          style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--text)' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)' }}
+                        >
+                          <X size={13} />
+                        </button>
                       </div>
                     ) : (
                       <button
                         onClick={() => { setAddingTodoDay(dayKey); setNewTodoTitle('') }}
-                        className="flex items-center gap-0.5 text-[10px] transition-colors mt-0.5 px-0.5"
-                        style={{ color: 'var(--text-dim)' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
-                        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
+                        className="flex items-center gap-1 text-[11px] transition-all mt-0.5 px-1.5 py-1 rounded-lg w-full"
+                        style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-dim)'; e.currentTarget.style.color = 'var(--accent-light)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)' }}
                       >
-                        <Plus size={10} /><span>추가</span>
+                        <Plus size={12} /><span>추가</span>
                       </button>
                     )}
                   </div>
@@ -1021,12 +1150,20 @@ export default function WeeklyBoard() {
           </div>
 
           {/* ── Day columns ── */}
-          {weekDays.map((day, di) => {
+          {visibleDays.map((day) => {
+            const di = weekDays.indexOf(day)
             const dateKey = format(day, 'yyyy-MM-dd')
             const dayEntries = entriesForDay(day)
             const dayGoogleEvents = googleEventsForDay(day)
             const today = isToday(day)
             const isAddingHere = addingEntry?.dateKey === dateKey
+
+            // 겹치는 항목 레이아웃 계산 (로컬 + 구글 통합)
+            const layoutItems = [
+              ...dayEntries.map(e => ({ id: e.id, start: e.startTime, end: e.endTime || addOneHour(e.startTime) })),
+              ...dayGoogleEvents.map(e => ({ id: `g_${e.id}`, start: format(new Date(e.start.dateTime), 'HH:mm'), end: format(new Date(e.end.dateTime), 'HH:mm') })),
+            ]
+            const layout = computeOverlapLayout(layoutItems)
 
             return (
               <div
@@ -1064,19 +1201,25 @@ export default function WeeklyBoard() {
                 )}
 
                 {/* Google Calendar Events */}
-                {dayGoogleEvents.map(event => (
-                  <GoogleEventBlock key={event.id} event={event} />
-                ))}
+                {dayGoogleEvents.map(event => {
+                  const lv = layout.get(`g_${event.id}`)
+                  return <GoogleEventBlock key={event.id} event={event} layoutCol={lv?.col} layoutTotal={lv?.total} />
+                })}
 
                 {/* Entries */}
-                {dayEntries.map(entry => (
-                  <EntryBlock
-                    key={entry.id}
-                    entry={entry}
-                    onDelete={() => deleteEntry(entry.id)}
-                    onDragStart={(e, type) => handleDragStart(e, entry, type)}
-                  />
-                ))}
+                {dayEntries.map(entry => {
+                  const lv = layout.get(entry.id)
+                  return (
+                    <EntryBlock
+                      key={entry.id}
+                      entry={entry}
+                      onDelete={() => deleteEntry(entry.id)}
+                      onDragStart={(e, type) => handleDragStart(e, entry, type)}
+                      layoutCol={lv?.col}
+                      layoutTotal={lv?.total}
+                    />
+                  )
+                })}
 
                 {/* Inline add form */}
                 {isAddingHere && (
@@ -1243,27 +1386,54 @@ const QUADRANTS = [
 ]
 
 function MatrixView({
-  todos, weekLabel,
-  onToggle, onToggleUrgent, onDelete,
+  todos, weekLabel, isMobile,
+  onToggle, onToggleUrgent, onDelete, onMove,
 }: {
   todos: Todo[]
   weekLabel: string
+  isMobile: boolean
   onToggle: (id: string, completed: boolean) => void
   onToggleUrgent: (id: string, urgent: boolean) => void
   onDelete: (id: string) => void
+  onMove: (id: string, urgent: boolean, important: boolean) => void
 }) {
-  const classify = (t: Todo) => ({
-    urgent: t.urgent,
-    important: t.priority === 'high',
-  })
+  const [dragOver, setDragOver] = useState<number | null>(null)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+
+  const classify = (t: Todo) => ({ urgent: t.urgent, important: t.priority === 'high' })
+
+  const handleDragStart = (e: React.DragEvent, todoId: string) => {
+    e.dataTransfer.setData('todoId', todoId)
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggingId(todoId)
+  }
+
+  const handleDrop = (e: React.DragEvent, qi: number) => {
+    e.preventDefault()
+    const todoId = e.dataTransfer.getData('todoId')
+    const q = QUADRANTS[qi]
+    if (todoId) onMove(todoId, q.urgent, q.important)
+    setDragOver(null)
+    setDraggingId(null)
+  }
 
   return (
     <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      {/* 축 라벨 — 데스크탑만 */}
+      {!isMobile && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', marginBottom: 2 }}>
+          <div className="text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>긴급함</div>
+          <div className="text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>긴급하지 않음</div>
+        </div>
+      )}
       <div
         style={{
-          display: 'grid', gridTemplateColumns: '1fr 1fr',
-          gridTemplateRows: '1fr 1fr',
-          gap: 10, flex: 1, overflow: 'hidden',
+          display: 'grid',
+          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+          gridTemplateRows: isMobile ? 'none' : '1fr 1fr',
+          gap: 8,
+          flex: isMobile ? undefined : 1,
+          overflow: isMobile ? 'auto' : 'hidden',
         }}
       >
         {QUADRANTS.map((q, qi) => {
@@ -1271,83 +1441,117 @@ function MatrixView({
             const c = classify(t)
             return c.urgent === q.urgent && c.important === q.important
           })
+          const isOver = dragOver === qi
           return (
             <div
               key={qi}
+              onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOver(qi) }}
+              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null) }}
+              onDrop={e => handleDrop(e, qi)}
               style={{
-                background: q.bg,
-                border: `1px solid ${q.color}44`,
+                background: isOver ? `${q.color}18` : q.bg,
+                border: `${isOver ? 2 : 1}px solid ${isOver ? q.color : `${q.color}44`}`,
                 borderRadius: 12, overflow: 'hidden',
                 display: 'flex', flexDirection: 'column',
+                transition: 'border 0.1s, background 0.1s',
               }}
             >
-              <div style={{ padding: '8px 12px', borderBottom: `1px solid ${q.color}33`, background: `${q.color}10` }}>
+              <div style={{ padding: '10px 14px', borderBottom: `1px solid ${q.color}33`, background: `${q.color}10` }}>
                 <div className="flex items-center gap-2">
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: q.color }} />
-                  <span className="font-semibold text-[12px]" style={{ color: q.color }}>{q.label}</span>
-                  <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>{q.sub}</span>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: q.color }} />
+                  <span className="font-semibold text-[14px]" style={{ color: q.color }}>{q.label}</span>
+                  <span className="text-[11px]" style={{ color: 'var(--text-dim)' }}>{q.sub}</span>
                   {items.length > 0 && (
-                    <span className="ml-auto text-[10px] font-bold" style={{ color: q.color }}>{items.length}</span>
+                    <span className="ml-auto text-[11px] font-bold" style={{ color: q.color }}>{items.length}</span>
                   )}
                 </div>
               </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }} className="space-y-1">
+              <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }} className="space-y-1.5">
                 {items.length === 0 ? (
-                  <div className="text-[11px] text-center pt-4" style={{ color: 'var(--text-dim)', opacity: 0.4 }}>없음</div>
+                  <div
+                    className="text-[13px] text-center pt-6"
+                    style={{ color: isOver ? q.color : 'var(--text-dim)', opacity: isOver ? 0.7 : 0.4 }}
+                  >
+                    {isOver ? '여기에 놓기' : '없음'}
+                  </div>
                 ) : items.map(todo => (
                   <div
                     key={todo.id}
-                    className="flex items-center gap-1.5 group px-2 py-1 rounded-lg"
-                    style={{ background: 'var(--bg-card)' }}
+                    draggable
+                    onDragStart={e => handleDragStart(e, todo.id)}
+                    onDragEnd={() => { setDraggingId(null); setDragOver(null) }}
+                    className="flex items-center gap-2 group px-3 py-2 rounded-xl"
+                    style={{
+                      background: 'var(--bg-card)',
+                      opacity: draggingId === todo.id ? 0.4 : 1,
+                      cursor: 'grab',
+                      transition: 'opacity 0.15s',
+                      minHeight: 40,
+                    }}
                   >
                     <button
                       onClick={() => onToggle(todo.id, todo.completed)}
-                      className="w-3.5 h-3.5 rounded-sm flex-shrink-0 flex items-center justify-center"
+                      onMouseDown={e => e.stopPropagation()}
+                      className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center"
                       style={{
                         background: todo.completed ? 'var(--accent-dim)' : 'transparent',
-                        border: `1px solid ${todo.completed ? 'var(--accent)' : 'var(--border)'}`,
+                        border: `1.5px solid ${todo.completed ? 'var(--accent)' : 'var(--border)'}`,
+                        cursor: 'pointer',
                       }}
                     >
-                      {todo.completed && <Check size={8} style={{ color: 'var(--accent-light)' }} />}
+                      {todo.completed && <Check size={11} style={{ color: 'var(--accent-light)' }} />}
                     </button>
                     <div
-                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                      style={{ background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium, opacity: 0.7 }}
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium, opacity: 0.8 }}
                     />
                     <span
-                      className="text-[11px] flex-1 truncate"
+                      className="text-[13px] flex-1 truncate"
                       style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
                     >
                       {todo.title}
                     </span>
                     {todo.date && (
-                      <span className="text-[9px] flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
+                      <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
                         {format(new Date(todo.date), 'M/d')}
                       </span>
                     )}
                     <button
                       onClick={() => onToggleUrgent(todo.id, todo.urgent)}
-                      className={`flex-shrink-0 transition-all ${todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}
-                      style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)' }}
+                      className={`flex-shrink-0 p-1 rounded transition-all ${todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
+                      style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)', cursor: 'pointer' }}
+                      title={todo.urgent ? '긴급 해제' : '긴급 표시'}
                     >
-                      <AlertCircle size={10} />
+                      <AlertCircle size={15} />
                     </button>
                     <button
                       onClick={() => onDelete(todo.id)}
-                      className="opacity-0 group-hover:opacity-100 flex-shrink-0"
-                      style={{ color: 'var(--text-dim)' }}
+                      className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-1 rounded transition-all"
+                      style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
+                      title="삭제"
                     >
-                      <X size={10} />
+                      <X size={15} />
                     </button>
                   </div>
                 ))}
+                {/* 드래그 중 빈 공간에도 drop 가능하도록 패딩 영역 */}
+                {draggingId && items.length > 0 && isOver && (
+                  <div
+                    style={{
+                      height: 40, borderRadius: 10, border: `2px dashed ${q.color}66`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <span className="text-[12px]" style={{ color: q.color }}>여기에 놓기</span>
+                  </div>
+                )}
               </div>
             </div>
           )
         })}
       </div>
       <div className="mt-2 text-center text-[10px]" style={{ color: 'var(--text-dim)' }}>
-        {weekLabel} · 주간 할일 기준 · 중요 = priority high · 할일에서 ! 클릭으로 긴급 표시
+        {weekLabel} · 카드를 드래그해서 분면 이동 · 중요 = priority high · ! 클릭으로 긴급 표시
       </div>
     </div>
   )
