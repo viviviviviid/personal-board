@@ -54,11 +54,11 @@ export default function HabitTracker() {
       prev.map((h) =>
         h.id === habitId
           ? {
-              ...h,
-              logs: h.logs.some((l) => l.habitId === habitId)
-                ? h.logs.map((l) => (l.habitId === habitId ? { ...l, completed: !currentCompleted } : l))
-                : [...h.logs, { id: 'temp', habitId, date: today, completed: true }],
-            }
+            ...h,
+            logs: h.logs.some((l) => l.habitId === habitId)
+              ? h.logs.map((l) => (l.habitId === habitId ? { ...l, completed: !currentCompleted } : l))
+              : [...h.logs, { id: 'temp', habitId, date: today, completed: true }],
+          }
           : h
       )
     )
@@ -109,11 +109,11 @@ export default function HabitTracker() {
   const completedCount = habits.filter((h) => h.logs.some((l) => l.completed)).length
 
   return (
-    <div className="bg-[#1a1a24] border border-[#2a2a3a] rounded-xl p-4">
+    <div className="bg-[var(--bg-card)] border border-[var(--border-rule)] rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Flame size={18} className="text-orange-400" />
-          <h3 className="text-sm font-semibold text-gray-200">오늘의 습관</h3>
+          <Flame size={18} className="text-[var(--warning)]" />
+          <h3 className="text-sm font-semibold text-[var(--text-bright)]">오늘의 습관</h3>
         </div>
         <div className="flex items-center gap-2">
           {habits.length > 0 && (
@@ -123,7 +123,7 @@ export default function HabitTracker() {
           )}
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className="w-6 h-6 flex items-center justify-center rounded-md bg-[#22222f] hover:bg-indigo-600/20 text-gray-400 hover:text-indigo-400 transition-colors"
+            className="w-6 h-6 flex items-center justify-center rounded-md bg-[var(--bg-input)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-light)] transition-colors"
           >
             {showAddForm ? <X size={14} /> : <Plus size={14} />}
           </button>
@@ -136,7 +136,7 @@ export default function HabitTracker() {
             type="text"
             value={newHabitEmoji}
             onChange={(e) => setNewHabitEmoji(e.target.value)}
-            className="w-10 bg-[#22222f] border border-[#2a2a3a] rounded-lg px-2 py-1.5 text-sm text-center"
+            className="w-10 bg-[var(--bg-input)] border border-[var(--border-dim)] rounded-lg px-2 py-1.5 text-sm text-center"
             maxLength={2}
           />
           <input
@@ -144,13 +144,13 @@ export default function HabitTracker() {
             value={newHabitName}
             onChange={(e) => setNewHabitName(e.target.value)}
             placeholder="새 습관 이름..."
-            className="flex-1 bg-[#22222f] border border-[#2a2a3a] rounded-lg px-3 py-1.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50"
+            className="flex-1 bg-[var(--bg-input)] border border-[var(--border-dim)] rounded-lg px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
             autoFocus
           />
           <button
             type="submit"
             disabled={adding}
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs rounded-lg transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-xs rounded-lg transition-colors disabled:opacity-50"
           >
             추가
           </button>
@@ -176,19 +176,15 @@ export default function HabitTracker() {
               >
                 <button
                   onClick={() => toggleHabit(habit.id, isCompleted)}
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${
-                    isCompleted
-                      ? 'bg-emerald-500 border-emerald-500'
-                      : 'border-[#3a3a4a] hover:border-emerald-500/50'
-                  }`}
+                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${!isCompleted ? 'hover:border-[var(--accent)]' : ''}`}
+                  style={isCompleted ? { background: habit.color || 'var(--accent)', borderColor: habit.color || 'var(--accent)' } : { borderColor: 'var(--border)' }}
                 >
                   {isCompleted && <Check size={12} className="text-white" />}
                 </button>
                 <span className="text-sm">{habit.emoji}</span>
                 <span
-                  className={`flex-1 text-sm ${
-                    isCompleted ? 'line-through text-gray-600' : 'text-gray-300'
-                  }`}
+                  className={`flex-1 text-sm ${isCompleted ? 'line-through text-[var(--text-dim)]' : 'text-[var(--text)]'
+                    }`}
                 >
                   {habit.name}
                 </span>
@@ -205,11 +201,11 @@ export default function HabitTracker() {
       )}
 
       {habits.length > 0 && !loading && !error && (
-        <div className="mt-3 pt-3 border-t border-[#2a2a3a]">
+        <div className="mt-3 pt-3 border-t border-[var(--border-rule)]">
           <div className="flex items-center gap-2">
-            <div className="flex-1 bg-[#22222f] rounded-full h-1.5">
+            <div className="flex-1 bg-[var(--bg-input)] rounded-full h-1.5">
               <div
-                className="bg-gradient-to-r from-emerald-500 to-green-400 h-1.5 rounded-full transition-all duration-500"
+                className="bg-gradient-to-r from-[var(--accent-light)] to-[var(--accent)] h-1.5 rounded-full transition-all duration-500"
                 style={{ width: `${habits.length > 0 ? (completedCount / habits.length) * 100 : 0}%` }}
               />
             </div>

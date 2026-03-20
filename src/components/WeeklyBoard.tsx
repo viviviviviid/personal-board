@@ -31,19 +31,19 @@ interface TimelineEntry {
 const HOURS = Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, i) => i + FIRST_HOUR)
 const DAYS_KO = ['월', '화', '수', '목', '금', '토', '일']
 
-// Warm notebook category colors
+// Obsidian category colors
 const CAT_STYLE: Record<string, { bg: string; text: string; border: string }> = {
-  work:     { bg: 'rgba(199,137,40,0.15)',  text: '#f2c063', border: 'rgba(199,137,40,0.35)' },
-  personal: { bg: 'rgba(149,165,134,0.15)', text: '#b0c8a0', border: 'rgba(149,165,134,0.35)' },
-  exercise: { bg: 'rgba(196,109,80,0.15)',  text: '#e0987a', border: 'rgba(196,109,80,0.35)' },
-  study:    { bg: 'rgba(104,136,196,0.15)', text: '#88aad8', border: 'rgba(104,136,196,0.35)' },
+  work: { bg: 'rgba(139, 92, 246, 0.25)', text: '#A78BFA', border: 'rgba(139, 92, 246, 0.5)' },
+  personal: { bg: 'rgba(16, 185, 129, 0.25)', text: '#34D399', border: 'rgba(16, 185, 129, 0.5)' },
+  exercise: { bg: 'rgba(245, 158, 11, 0.25)', text: '#FBBF24', border: 'rgba(245, 158, 11, 0.5)' },
+  study: { bg: 'rgba(59, 130, 246, 0.25)', text: '#60A5FA', border: 'rgba(59, 130, 246, 0.5)' },
 }
 const DEF_STYLE = { bg: 'var(--bg-hover)', text: 'var(--text-muted)', border: 'var(--border)' }
 
 const PRIORITY_COLOR: Record<string, string> = {
-  high:   '#a85848',
-  medium: '#c4935a',
-  low:    '#95a586',
+  high: '#EF4444',
+  medium: '#F59E0B',
+  low: '#A1A1AA',
 }
 
 // ── Entry block ────────────────────────────────────────────────────────────
@@ -327,7 +327,7 @@ export default function WeeklyBoard() {
       {error && (
         <div
           className="mb-3 p-2 rounded-lg text-xs flex-shrink-0"
-          style={{ background: 'rgba(168,88,72,0.1)', border: '1px solid rgba(168,88,72,0.3)', color: 'var(--danger)' }}
+          style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--danger)' }}
         >
           {error}
         </div>
@@ -352,14 +352,14 @@ export default function WeeklyBoard() {
                 key={i}
                 className="sticky top-0 z-30 px-2 py-2"
                 style={{
-                  background: today ? 'rgba(199,137,40,0.08)' : 'var(--bg-surface)',
+                  background: today ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-surface)',
                   borderLeft: '1px solid var(--border)',
                   borderBottom: '1px solid var(--border)',
                 }}
               >
                 <div
                   className="text-[11px] font-semibold tracking-wide"
-                  style={{ color: today ? 'var(--accent)' : i >= 5 ? '#a07060' : 'var(--text-dim)' }}
+                  style={{ color: today ? 'var(--accent)' : i >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}
                 >
                   {DAYS_KO[i]}
                 </div>
@@ -391,7 +391,7 @@ export default function WeeklyBoard() {
                 key={i}
                 className="p-1.5"
                 style={{
-                  background: today ? 'rgba(199,137,40,0.05)' : 'var(--bg-card)',
+                  background: today ? 'rgba(139, 92, 246, 0.05)' : 'var(--bg-card)',
                   borderLeft: '1px solid var(--border)',
                   borderBottom: '1px solid var(--border)',
                   minHeight: 80,
@@ -518,7 +518,7 @@ export default function WeeklyBoard() {
                 ref={el => { columnRefs.current[di] = el }}
                 style={{
                   position: 'relative', height: TOTAL_H,
-                  background: today ? 'rgba(199,137,40,0.04)' : 'var(--bg-surface)',
+                  background: today ? 'rgba(139, 92, 246, 0.04)' : 'var(--bg-surface)',
                   borderLeft: '1px solid var(--border)',
                 }}
                 className="paper-lines"
@@ -542,7 +542,7 @@ export default function WeeklyBoard() {
                         className="w-2 h-2 rounded-full flex-shrink-0 -ml-1"
                         style={{ background: 'var(--accent)', boxShadow: '0 0 6px var(--accent)' }}
                       />
-                      <div className="flex-1 h-px" style={{ background: 'rgba(199,137,40,0.5)' }} />
+                      <div className="flex-1 h-px" style={{ background: 'rgba(139, 92, 246, 0.5)' }} />
                     </div>
                   </div>
                 )}
@@ -568,7 +568,7 @@ export default function WeeklyBoard() {
                       border: '1px solid var(--accent-dim)',
                       borderRadius: 10,
                     }}
-                    className="p-2 shadow-2xl"
+                    className="p-2"
                     onClick={e => e.stopPropagation()}
                   >
                     <input

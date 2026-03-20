@@ -83,11 +83,11 @@ export default function AIFeedback({ weekStart }: AIFeedbackProps) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
             className="absolute inset-0 backdrop-blur-sm"
-            style={{ background: 'rgba(10,8,4,0.7)' }}
+            style={{ background: 'rgba(0, 0, 0, 0.7)' }}
             onClick={() => setIsOpen(false)}
           />
           <div
-            className="relative w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl rounded-2xl overflow-hidden"
+            className="relative w-full max-w-lg max-h-[80vh] flex flex-col rounded-2xl overflow-hidden border border-[var(--border)]"
             style={{
               background: 'var(--bg-card)',
               border: '1px solid var(--border)',
@@ -132,8 +132,8 @@ export default function AIFeedback({ weekStart }: AIFeedbackProps) {
                 <div
                   className="rounded-xl p-4 text-sm"
                   style={{
-                    background: 'rgba(168,88,72,0.1)',
-                    border: '1px solid rgba(168,88,72,0.3)',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
                     color: 'var(--danger)',
                   }}
                 >

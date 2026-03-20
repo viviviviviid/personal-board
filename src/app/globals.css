@@ -1,35 +1,35 @@
 @import "tailwindcss";
 
-/* ── Notebook Dark Palette ───────────────────────────────────────────────── */
+/* ── Obsidian Default Dark Palette ───────────────────────────────────────── */
 :root {
-  /* Backgrounds — espresso to worn leather */
-  --bg-base:      #1a150f;   /* darkest: moleskine cover */
-  --bg-surface:   #231d14;   /* page background */
-  --bg-card:      #2d2619;   /* card: aged paper */
-  --bg-input:     #352e20;   /* input field */
-  --bg-hover:     #3d3526;   /* hover state */
+  /* Background layers - deep dark cool grays */
+  --bg-base:      #18181B;   /* Zinc 900 */
+  --bg-surface:   #27272A;   /* Zinc 800 */
+  --bg-card:      #1F1F22;   /* Slightly lighter than base */
+  --bg-input:     #111113;   /* Very dark */
+  --bg-hover:     #333338;   /* Interactive */
 
-  /* Borders — aged ink lines */
-  --border:       #4a4130;
-  --border-dim:   #38321f;
-  --border-rule:  #2e2818;   /* subtle rule lines */
+  /* Borders - minimal, restrained */
+  --border:       #3F3F46;   /* Zinc 700 */
+  --border-dim:   #27272A;   /* Zinc 800 */
+  --border-rule:  #52525B;   /* Zinc 600 */
 
-  /* Text — fresh to faded ink */
-  --text:         #ddd0b8;   /* parchment — body */
-  --text-bright:  #f2e8d4;   /* cream — headings */
-  --text-muted:   #9a8e78;   /* aged ink */
-  --text-dim:     #5e5440;   /* faded pencil */
+  /* Text hierarchy - bright white to soft gray */
+  --text:         #D4D4D8;   /* Zinc 300 - primary */
+  --text-bright:  #F4F4F5;   /* Zinc 100 - headings */
+  --text-muted:   #A1A1AA;   /* Zinc 400 - secondary */
+  --text-dim:     #71717A;   /* Zinc 500 - deactivated */
 
-  /* Accent — antique gold / amber */
-  --accent:       #c78928;
-  --accent-light: #f2c063;
-  --accent-dim:   #8a5e18;
+  /* Accent colors - violet */
+  --accent:       #8B5CF6;   /* Violet 500 */
+  --accent-light: #A78BFA;   /* Violet 400 */
+  --accent-dim:   #5B21B6;   /* Violet 900 */
 
   /* Status */
-  --success:      #95a586;   /* sage green */
-  --success-dim:  #4a6a40;
-  --danger:       #a85848;   /* muted red */
-  --warning:      #c4935a;   /* warm orange */
+  --success:      #10B981;   /* Emerald 500 */
+  --success-dim:  #064E3B;   /* Emerald 900 */
+  --danger:       #EF4444;   /* Red 500 */
+  --warning:      #F59E0B;   /* Amber 500 */
 
   /* Font */
   --font-hand:    var(--font-caveat), 'Caveat', sans-serif;
