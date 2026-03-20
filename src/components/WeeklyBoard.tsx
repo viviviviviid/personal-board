@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday, addMonths, subMonths, startOfMonth } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink, AlertCircle } from 'lucide-react'
 import { signIn } from 'next-auth/react'
 import AIFeedback from './AIFeedback'
 import MonthlyCalendar from './MonthlyCalendar'
+import PomodoroTimer from './PomodoroTimer'
 import {
   FIRST_HOUR, LAST_HOUR, ROW_H, SNAP, TOTAL_H,
   timeToY, yToTime, addOneHour, nowToY,
@@ -33,7 +34,15 @@ interface Todo {
   title: string
   completed: boolean
   priority: string
+  urgent: boolean
   date: string | null
+}
+
+interface DailyHighlight {
+  id: string
+  date: string
+  content: string
+  completed: boolean
 }
 
 interface TimelineEntry {
@@ -149,7 +158,7 @@ function GoogleEventBlock({ event }: { event: GoogleCalendarEvent }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function WeeklyBoard() {
-  const [view, setView] = useState<'weekly' | 'monthly'>('weekly')
+  const [view, setView] = useState<'weekly' | 'monthly' | 'matrix'>('weekly')
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   )
@@ -161,6 +170,7 @@ export default function WeeklyBoard() {
   const [calendarList, setCalendarList] = useState<GoogleCalendar[]>([])
   const [weeklyEnabledCals, setWeeklyEnabledCals] = useState<Set<string>>(new Set())
   const [monthlyEnabledCals, setMonthlyEnabledCals] = useState<Set<string>>(new Set())
+  const [highlights, setHighlights] = useState<DailyHighlight[]>([])
   const [calPanelOpen, setCalPanelOpen] = useState(false)
   const [calStatus, setCalStatus] = useState<'loading' | 'ok' | 'no_token' | 'error'>('loading')
   const [loading, setLoading] = useState(true)
@@ -257,7 +267,7 @@ export default function WeeklyBoard() {
   // 좌우 화살표 키로 주 이동
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (view !== 'weekly') return
+      if (view !== 'weekly' && view !== 'matrix') return
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === 'ArrowLeft') setCurrentWeekStart(d => subWeeks(d, 1))
@@ -288,6 +298,12 @@ export default function WeeklyBoard() {
       const wp = format(currentWeekStart, 'yyyy-MM-dd')
       const timeMin = currentWeekStart.toISOString()
       const timeMax = addDays(currentWeekStart, 7).toISOString()
+
+      // 하이라이트 fetch (weekly view용)
+      fetch(`/api/daily-highlight?week=${wp}`)
+        .then(r => r.ok ? r.json() : [])
+        .then(setHighlights)
+        .catch(() => {})
 
       const gcPromise = weeklyEnabledCals.size > 0
         ? (() => {
@@ -323,6 +339,54 @@ export default function WeeklyBoard() {
   useEffect(() => { fetchData() }, [fetchData])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
+  const toggleUrgent = async (id: string, urgent: boolean) => {
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, urgent: !urgent } : t))
+    await fetch(`/api/todos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urgent: !urgent }),
+    }).catch(() => fetchData())
+  }
+
+  const setHighlight = async (date: string, content: string) => {
+    if (!content.trim()) return
+    try {
+      const res = await fetch('/api/daily-highlight', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, content }),
+      })
+      if (res.ok) {
+        const h = await res.json()
+        setHighlights(prev => {
+          const filtered = prev.filter(x => x.date !== date)
+          return [...filtered, h]
+        })
+      }
+    } catch { /* ignore */ }
+  }
+
+  const toggleHighlight = async (h: DailyHighlight) => {
+    try {
+      const res = await fetch('/api/daily-highlight', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: h.date, completed: !h.completed }),
+      })
+      if (res.ok) {
+        const updated = await res.json()
+        setHighlights(prev => prev.map(x => x.date === h.date ? updated : x))
+      }
+    } catch { /* ignore */ }
+  }
+
+  const deleteHighlight = async (date: string) => {
+    try {
+      await fetch(`/api/daily-highlight?date=${date}`, { method: 'DELETE' })
+      setHighlights(prev => prev.filter(x => x.date !== date))
+    } catch { /* ignore */ }
+  }
+
   const toggleTodo = async (id: string, completed: boolean) => {
     setTodos(prev => prev.map(t => t.id === id ? { ...t, completed: !completed } : t))
     await fetch(`/api/todos/${id}`, {
@@ -340,7 +404,7 @@ export default function WeeklyBoard() {
   const submitTodo = async (day: Date) => {
     if (!newTodoTitle.trim()) { setAddingTodoDay(null); return }
     const tempId = `temp-${Date.now()}`
-    const todo: Todo = { id: tempId, title: newTodoTitle.trim(), completed: false, priority: 'medium', date: day.toISOString() }
+    const todo: Todo = { id: tempId, title: newTodoTitle.trim(), completed: false, priority: 'medium', urgent: false, date: day.toISOString() }
     setTodos(prev => [...prev, todo])
     setNewTodoTitle('')
     setAddingTodoDay(null)
@@ -470,10 +534,10 @@ export default function WeeklyBoard() {
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div>
           <h1 className="text-lg font-bold" style={{ color: 'var(--text-bright)' }}>
-            {view === 'weekly' ? '주간 보드' : '월간 캘린더'}
+            {view === 'weekly' ? '주간 보드' : view === 'monthly' ? '월간 캘린더' : '매트릭스'}
           </h1>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
-            {view === 'weekly' ? weekLabel : monthLabel}
+            {view === 'weekly' ? weekLabel : view === 'monthly' ? monthLabel : '긴급/중요 우선순위'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -482,7 +546,7 @@ export default function WeeklyBoard() {
             className="flex rounded-lg overflow-hidden"
             style={{ border: '1px solid var(--border)' }}
           >
-            {(['weekly', 'monthly'] as const).map((v, i) => (
+            {(['weekly', 'monthly', 'matrix'] as const).map((v, i) => (
               <button
                 key={v}
                 onClick={() => setView(v)}
@@ -490,13 +554,15 @@ export default function WeeklyBoard() {
                 style={{
                   background: view === v ? 'var(--accent-dim)' : 'var(--bg-card)',
                   color: view === v ? 'var(--accent-light)' : 'var(--text-muted)',
-                  borderRight: i === 0 ? '1px solid var(--border)' : 'none',
+                  borderRight: i < 2 ? '1px solid var(--border)' : 'none',
                 }}
               >
-                {v === 'weekly' ? '주간' : '월간'}
+                {v === 'weekly' ? '주간' : v === 'monthly' ? '월간' : '매트릭스'}
               </button>
             ))}
           </div>
+          {/* 포모도로 타이머 */}
+          <PomodoroTimer />
 
           {/* Google Calendar 버튼 — 주간/월간 공통 */}
           <div style={{ position: 'relative' }} data-cal-panel>
@@ -646,7 +712,7 @@ export default function WeeklyBoard() {
                   </>
                 )}
               </div>
-          {view === 'weekly' ? (
+          {(view === 'weekly' || view === 'matrix') ? (
             <>
               <button
                 onClick={() => setCurrentWeekStart(d => subWeeks(d, 1))}
@@ -669,7 +735,7 @@ export default function WeeklyBoard() {
               >
                 <ChevronRight size={15} />
               </button>
-              <AIFeedback weekStart={currentWeekStart} />
+              {view === 'weekly' && <AIFeedback weekStart={currentWeekStart} />}
             </>
           ) : (
             <>
@@ -718,6 +784,17 @@ export default function WeeklyBoard() {
           )}
         </div>
       </div>
+
+      {/* ── 매트릭스 뷰 ────────────────────────────────────────────────────── */}
+      {view === 'matrix' && (
+        <MatrixView
+          todos={todos}
+          weekLabel={weekLabel}
+          onToggle={toggleTodo}
+          onToggleUrgent={toggleUrgent}
+          onDelete={deleteTodo}
+        />
+      )}
 
       {view === 'monthly' && (
         <MonthlyCalendar
@@ -775,6 +852,31 @@ export default function WeeklyBoard() {
                 </div>
                 <div className="text-[9px]" style={{ color: 'var(--text-dim)' }}>{format(day, 'MM/dd')}</div>
               </div>
+            )
+          })}
+
+          {/* ── Highlight section ── */}
+          <div
+            className="flex items-center justify-end pr-1.5"
+            style={{ background: 'rgba(234,179,8,0.06)', borderBottom: '1px solid var(--border)', minHeight: 40 }}
+          >
+            <span className="text-[9px] tracking-widest font-semibold" style={{ color: '#ca8a04' }}>★</span>
+          </div>
+          {weekDays.map((day, i) => {
+            const dayKey = format(day, 'yyyy-MM-dd')
+            const h = highlights.find(x => x.date === dayKey)
+            const today = isToday(day)
+            return (
+              <HighlightCell
+                key={`hl-${i}`}
+                day={day}
+                dayKey={dayKey}
+                highlight={h}
+                today={today}
+                onSet={setHighlight}
+                onToggle={toggleHighlight}
+                onDelete={deleteHighlight}
+              />
             )
           })}
 
@@ -837,6 +939,15 @@ export default function WeeklyBoard() {
                         >
                           {todo.title}
                         </span>
+                        {/* urgent toggle */}
+                        <button
+                          onClick={() => toggleUrgent(todo.id, todo.urgent)}
+                          className={`flex-shrink-0 mt-[1px] transition-all ${todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
+                          style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)' }}
+                          title={todo.urgent ? '긴급 해제' : '긴급 표시'}
+                        >
+                          <AlertCircle size={9} />
+                        </button>
                         <button
                           onClick={() => deleteTodo(todo.id)}
                           className="opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 mt-[2px]"
@@ -1029,6 +1140,215 @@ export default function WeeklyBoard() {
           })}
         </div>
       </div>}
+    </div>
+  )
+}
+
+// ── Highlight cell ──────────────────────────────────────────────────────────
+function HighlightCell({
+  day, dayKey, highlight, today,
+  onSet, onToggle, onDelete,
+}: {
+  day: Date
+  dayKey: string
+  highlight: DailyHighlight | undefined
+  today: boolean
+  onSet: (date: string, content: string) => void
+  onToggle: (h: DailyHighlight) => void
+  onDelete: (date: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
+
+  const submit = () => {
+    if (draft.trim()) onSet(dayKey, draft.trim())
+    setEditing(false)
+    setDraft('')
+  }
+
+  return (
+    <div
+      style={{
+        background: today ? 'rgba(234,179,8,0.07)' : 'rgba(234,179,8,0.03)',
+        borderLeft: '1px solid var(--border)',
+        borderBottom: '1px solid var(--border)',
+        padding: '4px 6px',
+        minHeight: 40,
+        display: 'flex', alignItems: 'center',
+      }}
+      onClick={() => { if (!highlight && !editing) { setEditing(true); setDraft('') } }}
+    >
+      {editing ? (
+        <input
+          ref={inputRef}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onClick={e => e.stopPropagation()}
+          onKeyDown={e => {
+            if (e.key === 'Enter') submit()
+            if (e.key === 'Escape') { setEditing(false); setDraft('') }
+          }}
+          onBlur={() => { submit() }}
+          placeholder="오늘의 하이라이트..."
+          className="w-full text-[11px] focus:outline-none bg-transparent"
+          style={{ color: 'var(--text)', borderBottom: '1px solid #ca8a04' }}
+        />
+      ) : highlight ? (
+        <div className="flex items-center gap-1 w-full group">
+          <button
+            onClick={e => { e.stopPropagation(); onToggle(highlight) }}
+            style={{
+              width: 12, height: 12, borderRadius: '50%', flexShrink: 0,
+              background: highlight.completed ? '#ca8a04' : 'transparent',
+              border: '1.5px solid #ca8a04',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {highlight.completed && <Check size={7} color="white" />}
+          </button>
+          <span
+            className="text-[11px] flex-1 truncate cursor-pointer"
+            style={{
+              color: highlight.completed ? 'var(--text-dim)' : '#ca8a04',
+              textDecoration: highlight.completed ? 'line-through' : 'none',
+            }}
+            onClick={e => { e.stopPropagation(); setEditing(true); setDraft(highlight.content) }}
+          >
+            {highlight.content}
+          </span>
+          <button
+            onClick={e => { e.stopPropagation(); onDelete(dayKey) }}
+            className="opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+            style={{ color: 'var(--text-dim)' }}
+          >
+            <X size={9} />
+          </button>
+        </div>
+      ) : (
+        <span className="text-[10px]" style={{ color: 'rgba(202,138,4,0.35)' }}>+ 설정</span>
+      )}
+    </div>
+  )
+}
+
+// ── Matrix view ─────────────────────────────────────────────────────────────
+const QUADRANTS = [
+  { label: '지금 해', sub: '긴급 + 중요', urgent: true, important: true, color: '#ef4444', bg: 'rgba(239,68,68,0.06)' },
+  { label: '일정 잡기', sub: '중요, 긴급 아님', urgent: false, important: true, color: '#3b82f6', bg: 'rgba(59,130,246,0.06)' },
+  { label: '위임', sub: '긴급, 중요 아님', urgent: true, important: false, color: '#f59e0b', bg: 'rgba(245,158,11,0.06)' },
+  { label: '제거', sub: '긴급 아님, 중요 아님', urgent: false, important: false, color: '#6b7280', bg: 'rgba(107,114,128,0.04)' },
+]
+
+function MatrixView({
+  todos, weekLabel,
+  onToggle, onToggleUrgent, onDelete,
+}: {
+  todos: Todo[]
+  weekLabel: string
+  onToggle: (id: string, completed: boolean) => void
+  onToggleUrgent: (id: string, urgent: boolean) => void
+  onDelete: (id: string) => void
+}) {
+  const classify = (t: Todo) => ({
+    urgent: t.urgent,
+    important: t.priority === 'high',
+  })
+
+  return (
+    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr',
+          gridTemplateRows: '1fr 1fr',
+          gap: 10, flex: 1, overflow: 'hidden',
+        }}
+      >
+        {QUADRANTS.map((q, qi) => {
+          const items = todos.filter(t => {
+            const c = classify(t)
+            return c.urgent === q.urgent && c.important === q.important
+          })
+          return (
+            <div
+              key={qi}
+              style={{
+                background: q.bg,
+                border: `1px solid ${q.color}44`,
+                borderRadius: 12, overflow: 'hidden',
+                display: 'flex', flexDirection: 'column',
+              }}
+            >
+              <div style={{ padding: '8px 12px', borderBottom: `1px solid ${q.color}33`, background: `${q.color}10` }}>
+                <div className="flex items-center gap-2">
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: q.color }} />
+                  <span className="font-semibold text-[12px]" style={{ color: q.color }}>{q.label}</span>
+                  <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>{q.sub}</span>
+                  {items.length > 0 && (
+                    <span className="ml-auto text-[10px] font-bold" style={{ color: q.color }}>{items.length}</span>
+                  )}
+                </div>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '6px 8px' }} className="space-y-1">
+                {items.length === 0 ? (
+                  <div className="text-[11px] text-center pt-4" style={{ color: 'var(--text-dim)', opacity: 0.4 }}>없음</div>
+                ) : items.map(todo => (
+                  <div
+                    key={todo.id}
+                    className="flex items-center gap-1.5 group px-2 py-1 rounded-lg"
+                    style={{ background: 'var(--bg-card)' }}
+                  >
+                    <button
+                      onClick={() => onToggle(todo.id, todo.completed)}
+                      className="w-3.5 h-3.5 rounded-sm flex-shrink-0 flex items-center justify-center"
+                      style={{
+                        background: todo.completed ? 'var(--accent-dim)' : 'transparent',
+                        border: `1px solid ${todo.completed ? 'var(--accent)' : 'var(--border)'}`,
+                      }}
+                    >
+                      {todo.completed && <Check size={8} style={{ color: 'var(--accent-light)' }} />}
+                    </button>
+                    <div
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium, opacity: 0.7 }}
+                    />
+                    <span
+                      className="text-[11px] flex-1 truncate"
+                      style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
+                    >
+                      {todo.title}
+                    </span>
+                    {todo.date && (
+                      <span className="text-[9px] flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
+                        {format(new Date(todo.date), 'M/d')}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => onToggleUrgent(todo.id, todo.urgent)}
+                      className={`flex-shrink-0 transition-all ${todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}
+                      style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)' }}
+                    >
+                      <AlertCircle size={10} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(todo.id)}
+                      className="opacity-0 group-hover:opacity-100 flex-shrink-0"
+                      style={{ color: 'var(--text-dim)' }}
+                    >
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-2 text-center text-[10px]" style={{ color: 'var(--text-dim)' }}>
+        {weekLabel} · 주간 할일 기준 · 중요 = priority high · 할일에서 ! 클릭으로 긴급 표시
+      </div>
     </div>
   )
 }

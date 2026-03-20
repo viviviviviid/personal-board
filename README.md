@@ -5,7 +5,10 @@
 ## 기능
 
 - **Google 로그인** — OAuth 2.0, 유저별 데이터 완전 격리
-- **주간 보드** — 요일별 투두 + 타임라인(드래그/리사이즈), 현재 시간 표시
+- **주간 보드** — 요일별 투두 + 타임라인(드래그/리사이즈), 현재 시간 표시, 좌우 화살표 키로 주 이동
+- **데일리 하이라이트** — 날짜별 오늘의 핵심 목표 1개 설정 (Make Time 방법론)
+- **아이젠하워 매트릭스** — 긴급/중요 2축으로 할일 4분면 분류 뷰 (주간 | 월간 | 매트릭스)
+- **포모도로 타이머** — 25분 집중 / 5분 휴식, 원형 프로그레스, 일일 세션 카운터
 - **월간 캘린더** — 1/2/3개월 동시 표시, 날짜 셀 클릭으로 투두 인라인 추가
 - **Google Calendar 연동** — 캘린더별 주간/월간 표시 여부를 독립적으로 토글
 - **습관 트래커** — 일별 체크인, 스트릭 표시
@@ -70,8 +73,9 @@ src/
 │   ├── login/                    # Google 로그인 페이지
 │   └── projects/[id]/            # 프로젝트 상세
 ├── components/
-│   ├── WeeklyBoard.tsx           # 주간/월간 뷰 메인 컴포넌트
+│   ├── WeeklyBoard.tsx           # 주간/월간/매트릭스 뷰 메인 컴포넌트
 │   ├── MonthlyCalendar.tsx       # 월간 캘린더
+│   ├── PomodoroTimer.tsx         # 포모도로 타이머 위젯
 │   ├── Sidebar.tsx               # 사이드바 (접기/펼치기, 로그아웃)
 │   ├── HabitTracker.tsx
 │   └── AIFeedback.tsx
@@ -81,6 +85,7 @@ src/
 │   ├── auth.ts                   # NextAuth v5 설정
 │   ├── google-token.ts           # access_token 갱신 로직
 │   └── prisma.ts
+├── app/api/daily-highlight/      # 데일리 하이라이트 CRUD
 └── proxy.ts                      # 인증 미들웨어 (middleware.ts 대체)
 ```
 

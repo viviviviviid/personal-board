@@ -21,6 +21,7 @@ model User {
   timelineEntries TimelineEntry[]
   habits        Habit[]
   projects      Project[]
+  highlights    DailyHighlight[]
 }
 
 model Account {
@@ -79,6 +80,7 @@ model Todo {
   description String?       @db.Text
   completed   Boolean       @default(false)
   priority    String        @default("medium")
+  urgent      Boolean       @default(false)
   date        DateTime?
   projectId   String?
   project     Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -123,4 +125,16 @@ model HabitLog {
   createdAt DateTime @default(now())
 
   @@unique([habitId, date])
+}
+
+model DailyHighlight {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String
+  content   String
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
 }

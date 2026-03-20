@@ -34,8 +34,25 @@ if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { st
 - `enabled-calendars-monthly`: 월간 캘린더에 표시할 캘린더 ID 배열
 - `sidebar-collapsed`: 사이드바 접힘 상태 (`'true'` / `'false'`)
 - `board-month-count`: 월간 표시 개수 (`'1'` / `'2'` / `'3'`)
+- `pomodoro-yyyy-MM-dd`: 해당 날짜의 완료 포모도로 세션 수
 
 ### 한글 IME 입력
 - `onKeyDown`에서 Enter 처리 시 `isComposing` 체크 필수
 - 패턴: `useImeInput` 훅 (`isComposing` ref + `onCompositionStart/End`) 사용
 - 위치: `src/app/projects/[id]/page.tsx`
+
+### 아이젠하워 매트릭스
+- Todo 모델의 `urgent: Boolean` + `priority: 'high'` 조합으로 4분면 도출
+- important = `priority === 'high'`, urgent = `todo.urgent === true`
+- 매트릭스 뷰는 WeeklyBoard.tsx 하단 `MatrixView` 컴포넌트 (파일 내 정의)
+- 주간 보드 할일 hover 시 `!` 아이콘으로 urgent 토글
+
+### 데일리 하이라이트
+- `DailyHighlight` 모델: `@@unique([userId, date])` — 유저별 날짜당 1개
+- API: `/api/daily-highlight` GET(week 파라미터)/POST(upsert)/PATCH/DELETE
+- WeeklyBoard.tsx 하단 `HighlightCell` 컴포넌트 (파일 내 정의)
+
+### 포모도로 타이머
+- `src/components/PomodoroTimer.tsx` — 독립 컴포넌트, DB 없이 localStorage만 사용
+- 집중 25분 → 휴식 5분 자동 전환, 브라우저 Notification API 사용
+- 세션 카운터 키: `pomodoro-yyyy-MM-dd`
