@@ -15,6 +15,21 @@ interface Todo {
   date: string | null
 }
 
+interface CalEvent {
+  id: string
+  summary?: string
+  start: { dateTime: string }
+  end: { dateTime: string }
+  calendarId: string
+  calendarColor: string
+}
+
+interface CalendarItem {
+  id: string
+  backgroundColor: string
+  summary: string
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────
 const DAYS_KO = ['월', '화', '수', '목', '금', '토', '일']
 const PRIORITY_COLOR: Record<string, string> = {
@@ -22,18 +37,20 @@ const PRIORITY_COLOR: Record<string, string> = {
   medium: '#F59E0B',
   low: '#A1A1AA',
 }
-// 월 제목 + 요일 헤더 높이 (px) — 고정
 const HEADER_H = 58
 
 // ── Props ──────────────────────────────────────────────────────────────────
 interface Props {
   currentMonth: Date
   monthCount: 1 | 2 | 3
+  enabledCalendars?: Set<string>
+  calendarList?: CalendarItem[]
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
-export default function MonthlyCalendar({ currentMonth, monthCount }: Props) {
+export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalendars, calendarList }: Props) {
   const [todos, setTodos] = useState<Todo[]>([])
+  const [calEvents, setCalEvents] = useState<CalEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [cellSize, setCellSize] = useState(80)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -43,7 +60,6 @@ export default function MonthlyCalendar({ currentMonth, monthCount }: Props) {
     [currentMonth, monthCount],
   )
 
-  // 표시되는 달 중 최대 주 수 (4~6주)
   const maxNumWeeks = useMemo(() => {
     return Math.max(...months.map(m => {
       const s = startOfWeek(startOfMonth(m), { weekStartsOn: 1 })
@@ -54,19 +70,14 @@ export default function MonthlyCalendar({ currentMonth, monthCount }: Props) {
     }))
   }, [months])
 
-  // 컨테이너 크기 변화 감지 → 셀 크기 재계산
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const obs = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
-      // 월별 가용 너비 (gap 제외)
       const perMonthW = (width - (monthCount - 1) * 12) / monthCount
-      // 가로 기준: 7칸으로 나눈 크기
       const fromW = Math.floor(perMonthW / 7)
-      // 세로 기준: 헤더 제외 후 주 수로 나눈 크기
       const fromH = Math.floor((height - HEADER_H) / maxNumWeeks)
-      // 둘 중 작은 값으로 비율 유지
       setCellSize(Math.max(36, Math.min(fromW, fromH)))
     })
     obs.observe(el)
@@ -87,10 +98,36 @@ export default function MonthlyCalendar({ currentMonth, monthCount }: Props) {
     }
   }, [currentMonth, monthCount])
 
+  const fetchCalEvents = useCallback(async () => {
+    if (!enabledCalendars || enabledCalendars.size === 0) {
+      setCalEvents([])
+      return
+    }
+    const ids = [...enabledCalendars]
+    const colors = ids.map(id => calendarList?.find(c => c.id === id)?.backgroundColor ?? '#4285F4')
+    const timeMin = startOfMonth(currentMonth).toISOString()
+    const timeMax = endOfMonth(addMonths(currentMonth, monthCount - 1)).toISOString()
+
+    try {
+      const res = await fetch(
+        `/api/google-calendar?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}&calendarIds=${ids.map(encodeURIComponent).join(',')}&calendarColors=${colors.map(encodeURIComponent).join(',')}`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setCalEvents(data.events ?? [])
+      }
+    } catch {
+      // ignore
+    }
+  }, [enabledCalendars, calendarList, currentMonth, monthCount])
+
   useEffect(() => { fetchTodos() }, [fetchTodos])
+  useEffect(() => { fetchCalEvents() }, [fetchCalEvents])
 
   const todosForDay = (day: Date) =>
     todos.filter(t => t.date && isSameDay(new Date(t.date), day))
+  const calEventsForDay = (day: Date) =>
+    calEvents.filter(e => isSameDay(new Date(e.start.dateTime), day))
 
   return (
     <div
@@ -110,6 +147,7 @@ export default function MonthlyCalendar({ currentMonth, monthCount }: Props) {
           month={month}
           cellSize={cellSize}
           todosForDay={todosForDay}
+          calEventsForDay={calEventsForDay}
           loading={loading}
           onRefresh={fetchTodos}
         />
@@ -123,12 +161,14 @@ function MonthGrid({
   month,
   cellSize,
   todosForDay,
+  calEventsForDay,
   loading,
   onRefresh,
 }: {
   month: Date
   cellSize: number
   todosForDay: (day: Date) => Todo[]
+  calEventsForDay: (day: Date) => CalEvent[]
   loading: boolean
   onRefresh: () => void
 }) {
@@ -171,13 +211,11 @@ function MonthGrid({
   const numWeeks = days.length / 7
   const gridWidth = cellSize * 7
 
-  // cellSize에 비례한 UI 수치
   const pad = Math.max(2, Math.round(cellSize * 0.05))
   const dateFontSize = Math.max(9, Math.min(13, Math.round(cellSize * 0.19)))
   const dateCircle = Math.max(16, Math.min(22, Math.round(cellSize * 0.31)))
   const todoFont = Math.max(8, Math.min(11, Math.round(cellSize * 0.14)))
   const dot = Math.max(4, Math.min(6, Math.round(cellSize * 0.08)))
-  // 셀 높이에서 날짜 원 + 패딩을 뺀 공간에 들어갈 투두 수
   const maxVisible = Math.max(1, Math.floor((cellSize - dateCircle - pad * 3) / (todoFont + 5)))
 
   return (
@@ -191,13 +229,7 @@ function MonthGrid({
       }}
     >
       {/* Month title */}
-      <div
-        style={{
-          background: 'var(--bg-surface)',
-          borderBottom: '1px solid var(--border)',
-          padding: '6px 10px',
-        }}
-      >
+      <div style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)', padding: '6px 10px' }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-bright)' }}>
           {format(month, 'yyyy년 M월')}
         </span>
@@ -216,11 +248,8 @@ function MonthGrid({
           <div
             key={i}
             style={{
-              textAlign: 'center',
-              padding: '4px 0',
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.04em',
+              textAlign: 'center', padding: '4px 0', fontSize: 10,
+              fontWeight: 600, letterSpacing: '0.04em',
               color: i >= 5 ? 'var(--text-muted)' : 'var(--text-dim)',
             }}
           >
@@ -241,24 +270,22 @@ function MonthGrid({
           const inMonth = isSameMonth(day, month)
           const today = isToday(day)
           const dayTodos = inMonth && !loading ? todosForDay(day) : []
-          const visible = dayTodos.slice(0, maxVisible)
-          const overflow = dayTodos.length - maxVisible
+          const dayCalEvents = inMonth && !loading ? calEventsForDay(day) : []
           const dayKey = format(day, 'yyyy-MM-dd')
           const isAdding = addingDay === dayKey
+
+          // 셀에 표시할 항목 수 계산
+          const todosVisible = dayTodos.slice(0, maxVisible)
+          const slotsLeft = Math.max(0, maxVisible - todosVisible.length)
+          const calVisible = dayCalEvents.slice(0, slotsLeft)
+          const overflow = (dayTodos.length - todosVisible.length) + (dayCalEvents.length - calVisible.length)
 
           return (
             <div
               key={i}
-              onClick={() => {
-                if (inMonth && !isAdding) {
-                  setAddingDay(dayKey)
-                  setNewTitle('')
-                }
-              }}
+              onClick={() => { if (inMonth && !isAdding) { setAddingDay(dayKey); setNewTitle('') } }}
               style={{
-                background: today
-                  ? 'rgba(139, 92, 246, 0.06)'
-                  : inMonth ? 'var(--bg-card)' : 'var(--bg-surface)',
+                background: today ? 'rgba(139, 92, 246, 0.06)' : inMonth ? 'var(--bg-card)' : 'var(--bg-surface)',
                 borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--border)' : 'none',
                 borderBottom: i < days.length - 7 ? '1px solid var(--border)' : 'none',
                 opacity: inMonth ? 1 : 0.3,
@@ -273,72 +300,81 @@ function MonthGrid({
               <div style={{ marginBottom: 2, flexShrink: 0 }}>
                 <span
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: dateCircle,
-                    height: dateCircle,
-                    borderRadius: '50%',
-                    fontSize: dateFontSize,
-                    fontWeight: 600,
-                    lineHeight: 1,
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: dateCircle, height: dateCircle, borderRadius: '50%',
+                    fontSize: dateFontSize, fontWeight: 600, lineHeight: 1,
                     background: today ? 'var(--accent)' : 'transparent',
-                    color: today
-                      ? 'var(--bg)'
-                      : i % 7 >= 5 ? 'var(--text-muted)' : 'var(--text)',
+                    color: today ? 'var(--bg)' : i % 7 >= 5 ? 'var(--text-muted)' : 'var(--text)',
                   }}
                 >
                   {format(day, 'd')}
                 </span>
               </div>
 
-              {/* Todos */}
+              {/* Items */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 1, overflow: 'hidden', flex: 1 }}>
-                {visible.map(todo => (
+                {/* Todos */}
+                {todosVisible.map(todo => (
                   <div
                     key={todo.id}
                     onClick={e => e.stopPropagation()}
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 2,
-                      padding: `1px ${pad}px`,
-                      borderRadius: 3,
+                      display: 'flex', alignItems: 'center', gap: 2,
+                      padding: `1px ${pad}px`, borderRadius: 3,
                       background: 'var(--bg-hover)',
                       fontSize: todoFont,
                       color: todo.completed ? 'var(--text-dim)' : 'var(--text)',
                       textDecoration: todo.completed ? 'line-through' : 'none',
-                      overflow: 'hidden',
-                      flexShrink: 0,
+                      overflow: 'hidden', flexShrink: 0,
                     }}
                   >
                     <div
                       style={{
-                        width: dot,
-                        height: dot,
-                        borderRadius: '50%',
-                        flexShrink: 0,
+                        width: dot, height: dot, borderRadius: '50%', flexShrink: 0,
                         background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium,
                         opacity: todo.completed ? 0.4 : 1,
                       }}
                     />
-                    <span
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        flex: 1,
-                      }}
-                    >
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                       {todo.title}
                     </span>
                   </div>
                 ))}
+
+                {/* Google Calendar Events */}
+                {calVisible.map(event => (
+                  <div
+                    key={event.id}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 2,
+                      padding: `1px ${pad}px`, borderRadius: 3,
+                      background: `${event.calendarColor}22`,
+                      fontSize: todoFont,
+                      color: event.calendarColor,
+                      overflow: 'hidden', flexShrink: 0,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: dot, height: dot, borderRadius: '50%', flexShrink: 0,
+                        background: event.calendarColor,
+                      }}
+                    />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {format(new Date(event.start.dateTime), 'H:mm')} {event.summary ?? '(제목 없음)'}
+                    </span>
+                  </div>
+                ))}
+
+                {/* 더보기 */}
                 {overflow > 0 && (
                   <div style={{ fontSize: Math.max(8, todoFont - 1), color: 'var(--text-dim)', paddingLeft: pad }}>
                     +{overflow} 더보기
                   </div>
                 )}
+
+                {/* 인라인 투두 추가 */}
                 {isAdding && (
                   <input
                     ref={inputRef}
@@ -346,14 +382,9 @@ function MonthGrid({
                     onChange={e => setNewTitle(e.target.value)}
                     onClick={e => e.stopPropagation()}
                     style={{
-                      fontSize: todoFont,
-                      width: '100%',
-                      background: 'var(--bg-input)',
-                      border: '1px solid var(--accent)',
-                      borderRadius: 3,
-                      color: 'var(--text)',
-                      padding: '1px 4px',
-                      outline: 'none',
+                      fontSize: todoFont, width: '100%',
+                      background: 'var(--bg-input)', border: '1px solid var(--accent)',
+                      borderRadius: 3, color: 'var(--text)', padding: '1px 4px', outline: 'none',
                     }}
                     onKeyDown={e => {
                       if (e.key === 'Enter') handleAddSubmit(day)

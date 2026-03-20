@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday, addMonths, subMonths, startOfMonth } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink } from 'lucide-react'
+import { signIn } from 'next-auth/react'
 import AIFeedback from './AIFeedback'
 import MonthlyCalendar from './MonthlyCalendar'
 import {
@@ -158,8 +159,10 @@ export default function WeeklyBoard() {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([])
   const [calendarList, setCalendarList] = useState<GoogleCalendar[]>([])
-  const [enabledCalendars, setEnabledCalendars] = useState<Set<string>>(new Set())
+  const [weeklyEnabledCals, setWeeklyEnabledCals] = useState<Set<string>>(new Set())
+  const [monthlyEnabledCals, setMonthlyEnabledCals] = useState<Set<string>>(new Set())
   const [calPanelOpen, setCalPanelOpen] = useState(false)
+  const [calStatus, setCalStatus] = useState<'loading' | 'ok' | 'no_token' | 'error'>('loading')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [now, setNow] = useState(new Date())
@@ -170,22 +173,38 @@ export default function WeeklyBoard() {
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
 
   // Google Calendar 목록 fetch
-  useEffect(() => {
-    fetch('/api/google-calendar/list')
-      .then(r => r.ok ? r.json() : { calendars: [] })
-      .then(data => {
-        const cals: GoogleCalendar[] = data.calendars ?? []
-        setCalendarList(cals)
-        // localStorage에서 활성화된 캘린더 복원, 없으면 전체 활성화
-        const saved = localStorage.getItem('enabled-calendars')
-        if (saved) {
-          setEnabledCalendars(new Set(JSON.parse(saved)))
-        } else {
-          setEnabledCalendars(new Set(cals.map(c => c.id)))
-        }
-      })
-      .catch(() => {})
+  const fetchCalendarList = useCallback(async () => {
+    setCalStatus('loading')
+    try {
+      const res = await fetch('/api/google-calendar/list')
+      if (!res.ok) { setCalStatus('error'); return }
+      const data = await res.json()
+      const status = data.status ?? 'ok'
+      const cals: GoogleCalendar[] = data.calendars ?? []
+
+      if (status === 'no_token') {
+        setCalStatus('no_token')
+        return
+      }
+      if (status !== 'ok' && cals.length === 0) {
+        setCalStatus('error')
+        return
+      }
+
+      setCalendarList(cals)
+      setCalStatus('ok')
+      const allIds = cals.map(c => c.id)
+      // localStorage에서 복원, 없으면 전체 활성화
+      const savedWeekly = localStorage.getItem('enabled-calendars-weekly')
+      setWeeklyEnabledCals(savedWeekly ? new Set(JSON.parse(savedWeekly)) : new Set(allIds))
+      const savedMonthly = localStorage.getItem('enabled-calendars-monthly')
+      setMonthlyEnabledCals(savedMonthly ? new Set(JSON.parse(savedMonthly)) : new Set(allIds))
+    } catch {
+      setCalStatus('error')
+    }
   }, [])
+
+  useEffect(() => { fetchCalendarList() }, [fetchCalendarList])
 
   // 패널 외부 클릭 시 닫기
   useEffect(() => {
@@ -198,12 +217,20 @@ export default function WeeklyBoard() {
     return () => document.removeEventListener('mousedown', handler)
   }, [calPanelOpen])
 
-  const toggleCalendar = (calId: string) => {
-    setEnabledCalendars(prev => {
+  const toggleCalendarWeekly = (calId: string) => {
+    setWeeklyEnabledCals(prev => {
       const next = new Set(prev)
-      if (next.has(calId)) next.delete(calId)
-      else next.add(calId)
-      localStorage.setItem('enabled-calendars', JSON.stringify([...next]))
+      if (next.has(calId)) next.delete(calId); else next.add(calId)
+      localStorage.setItem('enabled-calendars-weekly', JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  const toggleCalendarMonthly = (calId: string) => {
+    setMonthlyEnabledCals(prev => {
+      const next = new Set(prev)
+      if (next.has(calId)) next.delete(calId); else next.add(calId)
+      localStorage.setItem('enabled-calendars-monthly', JSON.stringify([...next]))
       return next
     })
   }
@@ -227,6 +254,19 @@ export default function WeeklyBoard() {
     return () => clearInterval(t)
   }, [])
 
+  // 좌우 화살표 키로 주 이동
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (view !== 'weekly') return
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'ArrowLeft') setCurrentWeekStart(d => subWeeks(d, 1))
+      if (e.key === 'ArrowRight') setCurrentWeekStart(d => addWeeks(d, 1))
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [view])
+
   const dragRef = useRef<{
     type: 'move' | 'resize'
     entryId: string
@@ -249,9 +289,9 @@ export default function WeeklyBoard() {
       const timeMin = currentWeekStart.toISOString()
       const timeMax = addDays(currentWeekStart, 7).toISOString()
 
-      const gcPromise = enabledCalendars.size > 0
+      const gcPromise = weeklyEnabledCals.size > 0
         ? (() => {
-            const ids = [...enabledCalendars]
+            const ids = [...weeklyEnabledCals]
             const colors = ids.map(id => calendarList.find(c => c.id === id)?.backgroundColor ?? '#4285F4')
             return fetch(
               `/api/google-calendar?timeMin=${timeMin}&timeMax=${timeMax}&calendarIds=${ids.map(encodeURIComponent).join(',')}&calendarColors=${colors.map(encodeURIComponent).join(',')}`
@@ -278,7 +318,7 @@ export default function WeeklyBoard() {
     } finally {
       setLoading(false)
     }
-  }, [currentWeekStart, enabledCalendars, calendarList])
+  }, [currentWeekStart, weeklyEnabledCals, calendarList])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -458,6 +498,154 @@ export default function WeeklyBoard() {
             ))}
           </div>
 
+          {/* Google Calendar 버튼 — 주간/월간 공통 */}
+          <div style={{ position: 'relative' }} data-cal-panel>
+                {/* 연결 안됨 or 에러 */}
+                {(calStatus === 'no_token' || calStatus === 'error') && (
+                  <button
+                    onClick={() => signIn('google', { callbackUrl: '/' })}
+                    className="p-1.5 rounded-lg transition-all flex items-center gap-1.5 text-[11px]"
+                    style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border)',
+                      color: 'var(--text-dim)',
+                    }}
+                    title="Google Calendar 연결"
+                  >
+                    <Unlink size={13} />
+                    <span>캘린더 연결</span>
+                  </button>
+                )}
+
+                {/* 로딩 중 */}
+                {calStatus === 'loading' && (
+                  <div
+                    className="p-1.5 rounded-lg flex items-center gap-1"
+                    style={{ border: '1px solid var(--border-dim)', color: 'var(--text-dim)' }}
+                  >
+                    <CalendarDays size={14} className="opacity-40" />
+                  </div>
+                )}
+
+                {/* 연결됨 */}
+                {calStatus === 'ok' && (
+                  <>
+                    <button
+                      onClick={() => setCalPanelOpen(v => !v)}
+                      className="p-1.5 rounded-lg transition-all flex items-center gap-1.5"
+                      style={{
+                        background: calPanelOpen ? 'var(--accent-dim)' : 'var(--bg-card)',
+                        border: `1px solid ${calPanelOpen ? 'var(--accent)' : 'var(--border)'}`,
+                        color: calPanelOpen ? 'var(--accent-light)' : 'var(--text-muted)',
+                      }}
+                      title="Google Calendar"
+                    >
+                      <CalendarDays size={14} />
+                    </button>
+
+                    {calPanelOpen && (
+                      <div
+                        style={{
+                          position: 'absolute', top: '100%', right: 0, marginTop: 6,
+                          background: 'var(--bg-surface)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 12, padding: '8px 4px',
+                          minWidth: 260, zIndex: 100,
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                        }}
+                      >
+                        {/* 패널 헤더 */}
+                        <div className="px-3 pb-1.5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-dim)', marginBottom: 4 }}>
+                          <span className="text-[10px] font-semibold tracking-wide" style={{ color: 'var(--text-dim)' }}>
+                            GOOGLE CALENDAR
+                          </span>
+                          <button
+                            onClick={() => { fetchCalendarList(); setCalPanelOpen(false) }}
+                            className="p-0.5 rounded transition-all"
+                            style={{ color: 'var(--text-dim)' }}
+                            title="새로고침"
+                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
+                          >
+                            <RefreshCw size={11} />
+                          </button>
+                        </div>
+
+                        {/* 열 라벨 */}
+                        <div className="flex items-center px-3 pb-1 mb-1" style={{ borderBottom: '1px solid var(--border-dim)' }}>
+                          <span className="flex-1 text-[10px]" style={{ color: 'var(--text-dim)' }} />
+                          <span className="w-7 text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>주</span>
+                          <span className="w-7 text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>월</span>
+                        </div>
+
+                        {/* 캘린더 목록 */}
+                        {calendarList.map(cal => (
+                          <div
+                            key={cal.id}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                            style={{ background: 'transparent' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <div
+                              style={{
+                                width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
+                                background: cal.backgroundColor,
+                              }}
+                            />
+                            <span className="text-[12px] truncate flex-1" style={{ color: 'var(--text)' }}>
+                              {cal.summary}
+                              {cal.primary && (
+                                <span className="ml-1 text-[9px]" style={{ color: 'var(--text-dim)' }}>기본</span>
+                              )}
+                            </span>
+                            {/* 주간 체크박스 */}
+                            <button
+                              onClick={() => toggleCalendarWeekly(cal.id)}
+                              className="w-7 flex items-center justify-center"
+                              title="주간에 표시"
+                            >
+                              <div style={{
+                                width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                                background: weeklyEnabledCals.has(cal.id) ? cal.backgroundColor : 'transparent',
+                                border: `2px solid ${weeklyEnabledCals.has(cal.id) ? cal.backgroundColor : 'var(--border)'}`,
+                                transition: 'all 0.15s',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {weeklyEnabledCals.has(cal.id) && (
+                                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                                    <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                            {/* 월간 체크박스 */}
+                            <button
+                              onClick={() => toggleCalendarMonthly(cal.id)}
+                              className="w-7 flex items-center justify-center"
+                              title="월간에 표시"
+                            >
+                              <div style={{
+                                width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                                background: monthlyEnabledCals.has(cal.id) ? cal.backgroundColor : 'transparent',
+                                border: `2px solid ${monthlyEnabledCals.has(cal.id) ? cal.backgroundColor : 'var(--border)'}`,
+                                transition: 'all 0.15s',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                {monthlyEnabledCals.has(cal.id) && (
+                                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                                    <path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
           {view === 'weekly' ? (
             <>
               <button
@@ -481,75 +669,6 @@ export default function WeeklyBoard() {
               >
                 <ChevronRight size={15} />
               </button>
-              {/* Google Calendar 토글 버튼 */}
-              {calendarList.length > 0 && (
-                <div style={{ position: 'relative' }} data-cal-panel>
-                  <button
-                    onClick={() => setCalPanelOpen(v => !v)}
-                    className="p-1.5 rounded-lg transition-all flex items-center gap-1.5"
-                    style={{
-                      background: calPanelOpen ? 'var(--accent-dim)' : 'var(--bg-card)',
-                      border: `1px solid ${calPanelOpen ? 'var(--accent)' : 'var(--border)'}`,
-                      color: calPanelOpen ? 'var(--accent-light)' : 'var(--text-muted)',
-                    }}
-                    title="Google Calendar"
-                  >
-                    <CalendarDays size={14} />
-                    {enabledCalendars.size < calendarList.length && (
-                      <span className="text-[10px] font-bold">
-                        {enabledCalendars.size}/{calendarList.length}
-                      </span>
-                    )}
-                  </button>
-
-                  {calPanelOpen && (
-                    <div
-                      style={{
-                        position: 'absolute', top: '100%', right: 0, marginTop: 6,
-                        background: 'var(--bg-surface)',
-                        border: '1px solid var(--border)',
-                        borderRadius: 12, padding: '8px 4px',
-                        minWidth: 220, zIndex: 100,
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                      }}
-                    >
-                      <div className="px-3 pb-1.5" style={{ borderBottom: '1px solid var(--border-dim)', marginBottom: 4 }}>
-                        <span className="text-[10px] font-semibold tracking-wide" style={{ color: 'var(--text-dim)' }}>
-                          GOOGLE CALENDAR
-                        </span>
-                      </div>
-                      {calendarList.map(cal => (
-                        <button
-                          key={cal.id}
-                          onClick={() => toggleCalendar(cal.id)}
-                          className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all text-left"
-                          style={{ background: 'transparent' }}
-                          onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                        >
-                          <div
-                            style={{
-                              width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-                              background: enabledCalendars.has(cal.id) ? cal.backgroundColor : 'transparent',
-                              border: `2px solid ${cal.backgroundColor}`,
-                              transition: 'background 0.15s',
-                            }}
-                          />
-                          <span
-                            className="text-[12px] truncate flex-1"
-                            style={{ color: enabledCalendars.has(cal.id) ? 'var(--text)' : 'var(--text-dim)' }}
-                          >
-                            {cal.summary}
-                            {cal.primary && (
-                              <span className="ml-1 text-[9px]" style={{ color: 'var(--text-dim)' }}>기본</span>
-                            )}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
               <AIFeedback weekStart={currentWeekStart} />
             </>
           ) : (
@@ -601,7 +720,12 @@ export default function WeeklyBoard() {
       </div>
 
       {view === 'monthly' && (
-        <MonthlyCalendar currentMonth={currentMonth} monthCount={monthCount} />
+        <MonthlyCalendar
+          currentMonth={currentMonth}
+          monthCount={monthCount}
+          enabledCalendars={monthlyEnabledCals}
+          calendarList={calendarList}
+        />
       )}
 
       {view === 'weekly' && error && (

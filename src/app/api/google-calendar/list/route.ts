@@ -16,14 +16,20 @@ export async function GET() {
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const accessToken = await getValidGoogleToken(session.user.id)
-    if (!accessToken) return NextResponse.json({ calendars: [] })
+    if (!accessToken) {
+      return NextResponse.json({ calendars: [], status: 'no_token' })
+    }
 
     const res = await fetch(
       'https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader',
       { headers: { Authorization: `Bearer ${accessToken}` } }
     )
 
-    if (!res.ok) return NextResponse.json({ calendars: [] })
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}))
+      console.error('Google Calendar list error:', res.status, errBody)
+      return NextResponse.json({ calendars: [], status: 'api_error', code: res.status })
+    }
 
     const data = await res.json()
     const calendars: GoogleCalendar[] = (data.items ?? []).map((c: GoogleCalendar) => ({
@@ -34,9 +40,9 @@ export async function GET() {
       primary: c.primary ?? false,
     }))
 
-    return NextResponse.json({ calendars })
+    return NextResponse.json({ calendars, status: 'ok' })
   } catch (error) {
     console.error('Failed to fetch calendar list:', error)
-    return NextResponse.json({ calendars: [] })
+    return NextResponse.json({ calendars: [], status: 'error' })
   }
 }
