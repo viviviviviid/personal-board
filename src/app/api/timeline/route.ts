@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 import { startOfDay, endOfDay, addDays } from 'date-fns'
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const searchParams = request.nextUrl.searchParams
     const dateParam = searchParams.get('date')
     const weekParam = searchParams.get('week')
@@ -13,6 +17,7 @@ export async function GET(request: NextRequest) {
       const weekEnd = addDays(weekStart, 6)
       const entries = await prisma.timelineEntry.findMany({
         where: {
+          userId: session.user.id,
           date: {
             gte: startOfDay(weekStart),
             lte: endOfDay(weekEnd),
@@ -27,6 +32,7 @@ export async function GET(request: NextRequest) {
 
     const entries = await prisma.timelineEntry.findMany({
       where: {
+        userId: session.user.id,
         date: {
           gte: startOfDay(date),
           lte: endOfDay(date),
@@ -44,6 +50,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const body = await request.json()
     const { date, startTime, endTime, title, description, category } = body
 
@@ -59,6 +68,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         category,
+        userId: session.user.id,
       },
     })
 

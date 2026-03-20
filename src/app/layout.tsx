@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import { Caveat } from 'next/font/google'
 import './globals.css'
 import Sidebar from '@/components/Sidebar'
+import SidebarWrapper from '@/components/SidebarWrapper'
+import { SidebarProvider } from '@/context/SidebarContext'
+import SessionProviderWrapper from '@/components/SessionProviderWrapper'
 
 const caveat = Caveat({
   subsets: ['latin'],
@@ -21,10 +24,12 @@ export default function RootLayout({
   return (
     <html lang="ko" className={`h-full ${caveat.variable}`}>
       <body className="min-h-full antialiased">
-        <Sidebar />
-        <main className="ml-60 min-h-screen p-4" style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-          {children}
-        </main>
+        <SessionProviderWrapper>
+          <SidebarProvider>
+            <Sidebar />
+            <SidebarWrapper>{children}</SidebarWrapper>
+          </SidebarProvider>
+        </SessionProviderWrapper>
       </body>
     </html>
   )

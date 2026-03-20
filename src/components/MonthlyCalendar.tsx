@@ -111,6 +111,7 @@ export default function MonthlyCalendar({ currentMonth, monthCount }: Props) {
           cellSize={cellSize}
           todosForDay={todosForDay}
           loading={loading}
+          onRefresh={fetchTodos}
         />
       ))}
     </div>
@@ -123,16 +124,43 @@ function MonthGrid({
   cellSize,
   todosForDay,
   loading,
+  onRefresh,
 }: {
   month: Date
   cellSize: number
   todosForDay: (day: Date) => Todo[]
   loading: boolean
+  onRefresh: () => void
 }) {
   const monthStart = startOfMonth(month)
   const monthEnd = endOfMonth(month)
   const calStart = startOfWeek(monthStart, { weekStartsOn: 1 })
   const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 })
+
+  const [addingDay, setAddingDay] = useState<string | null>(null)
+  const [newTitle, setNewTitle] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (addingDay) inputRef.current?.focus()
+  }, [addingDay])
+
+  const handleAddSubmit = async (day: Date) => {
+    const title = newTitle.trim()
+    setAddingDay(null)
+    setNewTitle('')
+    if (!title) return
+    try {
+      await fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, date: format(day, 'yyyy-MM-dd') }),
+      })
+      onRefresh()
+    } catch {
+      // ignore
+    }
+  }
 
   const days: Date[] = []
   let cur = calStart
@@ -215,10 +243,18 @@ function MonthGrid({
           const dayTodos = inMonth && !loading ? todosForDay(day) : []
           const visible = dayTodos.slice(0, maxVisible)
           const overflow = dayTodos.length - maxVisible
+          const dayKey = format(day, 'yyyy-MM-dd')
+          const isAdding = addingDay === dayKey
 
           return (
             <div
               key={i}
+              onClick={() => {
+                if (inMonth && !isAdding) {
+                  setAddingDay(dayKey)
+                  setNewTitle('')
+                }
+              }}
               style={{
                 background: today
                   ? 'rgba(139, 92, 246, 0.06)'
@@ -230,6 +266,7 @@ function MonthGrid({
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
+                cursor: inMonth ? 'pointer' : 'default',
               }}
             >
               {/* Date number */}
@@ -256,10 +293,11 @@ function MonthGrid({
               </div>
 
               {/* Todos */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1, overflow: 'hidden', flex: 1 }}>
                 {visible.map(todo => (
                   <div
                     key={todo.id}
+                    onClick={e => e.stopPropagation()}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -300,6 +338,29 @@ function MonthGrid({
                   <div style={{ fontSize: Math.max(8, todoFont - 1), color: 'var(--text-dim)', paddingLeft: pad }}>
                     +{overflow} 더보기
                   </div>
+                )}
+                {isAdding && (
+                  <input
+                    ref={inputRef}
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      fontSize: todoFont,
+                      width: '100%',
+                      background: 'var(--bg-input)',
+                      border: '1px solid var(--accent)',
+                      borderRadius: 3,
+                      color: 'var(--text)',
+                      padding: '1px 4px',
+                      outline: 'none',
+                    }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleAddSubmit(day)
+                      if (e.key === 'Escape') { setAddingDay(null); setNewTitle('') }
+                    }}
+                    onBlur={() => { setAddingDay(null); setNewTitle('') }}
+                  />
                 )}
               </div>
             </div>

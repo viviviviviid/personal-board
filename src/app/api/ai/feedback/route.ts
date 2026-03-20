@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { startOfDay, endOfDay, addDays, format } from 'date-fns'
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const body = await request.json()
     const { weekStart } = body
 
@@ -22,6 +26,7 @@ export async function POST(request: NextRequest) {
     try {
       todos = await prisma.todo.findMany({
         where: {
+          userId: session.user.id,
           date: {
             gte: startOfDay(weekStartDate),
             lte: endOfDay(weekEndDate),
@@ -36,6 +41,7 @@ export async function POST(request: NextRequest) {
       })
 
       habits = await prisma.habit.findMany({
+        where: { userId: session.user.id },
         include: {
           logs: {
             where: {

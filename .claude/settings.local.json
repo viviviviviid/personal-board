@@ -18,7 +18,11 @@
       "WebFetch(domain:icolorpalette.com)",
       "WebFetch(domain:www.media.io)",
       "WebFetch(domain:www.color-hex.com)",
-      "WebFetch(domain:daintyaesthetic.com)"
+      "WebFetch(domain:daintyaesthetic.com)",
+      "Bash(ls /home/tyy8282/project/tool/personal-board/.env*)",
+      "Bash(npm view:*)",
+      "Bash(python3 -c \"import sys,json; v=json.load\\(sys.stdin\\); print\\([x for x in v if x.startswith\\(''''5''''\\) or x.startswith\\(''''4.''''\\)][-5:]\\)\")",
+      "Bash(openssl rand:*)"
     ]
   }
 }

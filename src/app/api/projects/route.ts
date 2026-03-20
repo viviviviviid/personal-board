@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 
 export async function GET() {
   try {
+    const session = await auth()
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const projects = await prisma.project.findMany({
+      where: { userId: session.user.id },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
@@ -30,6 +35,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const body = await request.json()
     const { name, description, color, goal } = body
 
@@ -43,6 +51,7 @@ export async function POST(request: NextRequest) {
         description,
         color: color || '#6366f1',
         goal,
+        userId: session.user.id,
       },
     })
 

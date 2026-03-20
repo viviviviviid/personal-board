@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/lib/auth'
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { id } = await params
     const body = await request.json()
     const { title, completed, date, priority, projectId, sectionId, description } = body
@@ -20,7 +24,7 @@ export async function PATCH(
     if (description !== undefined) updateData.description = description
 
     const todo = await prisma.todo.update({
-      where: { id },
+      where: { id, userId: session.user.id },
       data: updateData,
       include: {
         project: {
@@ -41,10 +45,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await auth()
+    if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     const { id } = await params
 
     await prisma.todo.delete({
-      where: { id },
+      where: { id, userId: session.user.id },
     })
 
     return NextResponse.json({ success: true })
