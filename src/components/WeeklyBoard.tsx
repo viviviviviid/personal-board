@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday } from 'date-fns'
+import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, Check, X } from 'lucide-react'
 import AIFeedback from './AIFeedback'
+import MonthlyCalendar from './MonthlyCalendar'
 import {
   FIRST_HOUR, LAST_HOUR, ROW_H, SNAP, TOTAL_H,
   timeToY, yToTime, addOneHour, nowToY,
@@ -98,9 +99,12 @@ function EntryBlock({ entry, onDelete, onDragStart }: EntryBlockProps) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function WeeklyBoard() {
+  const [view, setView] = useState<'weekly' | 'monthly'>('weekly')
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   )
+  const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
+  const [monthCount, setMonthCount] = useState<1 | 2 | 3>(1)
   const [todos, setTodos] = useState<Todo[]>([])
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [loading, setLoading] = useState(true)
@@ -111,6 +115,19 @@ export default function WeeklyBoard() {
   const [newTodoTitle, setNewTodoTitle] = useState('')
   const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number } | null>(null)
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
+
+  // Persist monthCount
+  useEffect(() => {
+    const saved = localStorage.getItem('board-month-count')
+    if (saved === '1' || saved === '2' || saved === '3') {
+      setMonthCount(Number(saved) as 1 | 2 | 3)
+    }
+  }, [])
+
+  const setMonthCountPersist = (n: 1 | 2 | 3) => {
+    setMonthCount(n)
+    localStorage.setItem('board-month-count', String(n))
+  }
 
   // Current time
   useEffect(() => {
@@ -285,6 +302,9 @@ export default function WeeklyBoard() {
   const entriesForDay = (day: Date) =>
     timeline.filter(e => isSameDay(new Date(e.date), day))
   const weekLabel = `${format(currentWeekStart, 'yyyy.MM.dd')} — ${format(addDays(currentWeekStart, 6), 'MM.dd')}`
+  const monthLabel = monthCount === 1
+    ? format(currentMonth, 'yyyy년 M월')
+    : `${format(currentMonth, 'yyyy.MM')} — ${format(addMonths(currentMonth, monthCount - 1), 'yyyy.MM')}`
   const nowY = nowToY(now)
   const gridCols = `44px repeat(7, minmax(0, 1fr))`
 
@@ -295,36 +315,113 @@ export default function WeeklyBoard() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div>
-          <h1 className="text-lg font-bold" style={{ color: 'var(--text-bright)' }}>주간 보드</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>{weekLabel}</p>
+          <h1 className="text-lg font-bold" style={{ color: 'var(--text-bright)' }}>
+            {view === 'weekly' ? '주간 보드' : '월간 캘린더'}
+          </h1>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+            {view === 'weekly' ? weekLabel : monthLabel}
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCurrentWeekStart(d => subWeeks(d, 1))}
-            className="p-1.5 rounded-lg transition-all"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+          {/* View toggle */}
+          <div
+            className="flex rounded-lg overflow-hidden"
+            style={{ border: '1px solid var(--border)' }}
           >
-            <ChevronLeft size={15} />
-          </button>
-          <button
-            onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-            className="px-2.5 py-1 text-xs rounded-lg transition-all"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-          >
-            이번 주
-          </button>
-          <button
-            onClick={() => setCurrentWeekStart(d => addWeeks(d, 1))}
-            className="p-1.5 rounded-lg transition-all"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-          >
-            <ChevronRight size={15} />
-          </button>
-          <AIFeedback weekStart={currentWeekStart} />
+            {(['weekly', 'monthly'] as const).map((v, i) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                className="px-2.5 py-1 text-xs transition-all"
+                style={{
+                  background: view === v ? 'var(--accent-dim)' : 'var(--bg-card)',
+                  color: view === v ? 'var(--accent-light)' : 'var(--text-muted)',
+                  borderRight: i === 0 ? '1px solid var(--border)' : 'none',
+                }}
+              >
+                {v === 'weekly' ? '주간' : '월간'}
+              </button>
+            ))}
+          </div>
+
+          {view === 'weekly' ? (
+            <>
+              <button
+                onClick={() => setCurrentWeekStart(d => subWeeks(d, 1))}
+                className="p-1.5 rounded-lg transition-all"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <button
+                onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+                className="px-2.5 py-1 text-xs rounded-lg transition-all"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                이번 주
+              </button>
+              <button
+                onClick={() => setCurrentWeekStart(d => addWeeks(d, 1))}
+                className="p-1.5 rounded-lg transition-all"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                <ChevronRight size={15} />
+              </button>
+              <AIFeedback weekStart={currentWeekStart} />
+            </>
+          ) : (
+            <>
+              {/* Month count selector */}
+              <div
+                className="flex rounded-lg overflow-hidden"
+                style={{ border: '1px solid var(--border)' }}
+              >
+                {([1, 2, 3] as const).map((n, i) => (
+                  <button
+                    key={n}
+                    onClick={() => setMonthCountPersist(n)}
+                    className="px-2 py-1 text-xs transition-all"
+                    style={{
+                      background: monthCount === n ? 'var(--accent-dim)' : 'var(--bg-card)',
+                      color: monthCount === n ? 'var(--accent-light)' : 'var(--text-muted)',
+                      borderRight: i < 2 ? '1px solid var(--border)' : 'none',
+                    }}
+                  >
+                    {n}개월
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setCurrentMonth(d => subMonths(d, 1))}
+                className="p-1.5 rounded-lg transition-all"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                <ChevronLeft size={15} />
+              </button>
+              <button
+                onClick={() => setCurrentMonth(startOfMonth(new Date()))}
+                className="px-2.5 py-1 text-xs rounded-lg transition-all"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                이번 달
+              </button>
+              <button
+                onClick={() => setCurrentMonth(d => addMonths(d, 1))}
+                className="p-1.5 rounded-lg transition-all"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                <ChevronRight size={15} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {error && (
+      {view === 'monthly' && (
+        <MonthlyCalendar currentMonth={currentMonth} monthCount={monthCount} />
+      )}
+
+      {view === 'weekly' && error && (
         <div
           className="mb-3 p-2 rounded-lg text-xs flex-shrink-0"
           style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--danger)' }}
@@ -334,7 +431,7 @@ export default function WeeklyBoard() {
       )}
 
       {/* Grid */}
-      <div
+      {view === 'weekly' && <div
         className="flex-1 overflow-auto rounded-xl"
         style={{ minWidth: 0, border: '1px solid var(--border)' }}
       >
@@ -618,7 +715,7 @@ export default function WeeklyBoard() {
             )
           })}
         </div>
-      </div>
+      </div>}
     </div>
   )
 }

@@ -7,6 +7,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const dateParam = searchParams.get('date')
     const weekParam = searchParams.get('week')
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
 
     let where: Record<string, unknown> = {}
 
@@ -22,6 +24,11 @@ export async function GET(request: NextRequest) {
       where.date = {
         gte: startOfDay(weekStart),
         lte: endOfDay(weekEnd),
+      }
+    } else if (startDateParam && endDateParam) {
+      where.date = {
+        gte: startOfDay(new Date(startDateParam)),
+        lte: endOfDay(new Date(endDateParam)),
       }
     }
 
