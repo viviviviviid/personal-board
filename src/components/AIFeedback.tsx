@@ -67,10 +67,10 @@ export default function AIFeedback({ weekStart }: AIFeedbackProps) {
     <>
       <button
         onClick={getFeedback}
-        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 hover:from-indigo-600/30 hover:to-purple-600/30 border border-indigo-500/30 hover:border-indigo-500/50 text-indigo-300 hover:text-indigo-200 rounded-xl text-sm font-medium transition-all duration-200"
+        title="AI 주간 피드백"
+        className="p-1.5 bg-[#1c1c3a] border border-[#28285a] rounded-lg hover:border-indigo-500/50 text-[#8888bb] hover:text-indigo-400 transition-all"
       >
         <Sparkles size={16} />
-        이번 주 AI 피드백
       </button>
 
       {isOpen && (

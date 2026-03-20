@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { format, subDays, addDays, startOfDay } from 'date-fns'
+import { format, subDays, addDays } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { Plus, Check, X, Flame, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 
@@ -12,18 +12,27 @@ interface HabitLog {
   completed: boolean
 }
 
+interface WeekDay {
+  date: string
+  completed: boolean
+}
+
 interface Habit {
   id: string
   name: string
   emoji: string | null
   color: string
   logs: HabitLog[]
+  streak: number
+  weekHistory: WeekDay[]
 }
 
 const COLOR_OPTIONS = [
   '#10b981', '#6366f1', '#8b5cf6', '#ec4899',
   '#ef4444', '#f97316', '#eab308', '#3b82f6',
 ]
+
+const WEEK_LABELS = ['월', '화', '수', '목', '금', '토', '일']
 
 export default function HabitsPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -141,19 +150,19 @@ export default function HabitsPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCurrentDate((d) => subDays(d, 1))}
-            className="p-2 bg-[#1a1a24] border border-[#2a2a3a] rounded-lg hover:border-indigo-500/50 text-gray-400 hover:text-gray-200 transition-all"
+            className="p-2 bg-[#161628] border border-[#252542] rounded-lg hover:border-indigo-500/50 text-gray-400 hover:text-gray-200 transition-all"
           >
             <ChevronLeft size={18} />
           </button>
           <button
             onClick={() => setCurrentDate(new Date())}
-            className="px-3 py-1.5 text-xs bg-[#1a1a24] border border-[#2a2a3a] rounded-lg hover:border-indigo-500/50 text-gray-400 hover:text-gray-200 transition-all"
+            className="px-3 py-1.5 text-xs bg-[#161628] border border-[#252542] rounded-lg hover:border-indigo-500/50 text-gray-400 hover:text-gray-200 transition-all"
           >
             오늘
           </button>
           <button
             onClick={() => setCurrentDate((d) => addDays(d, 1))}
-            className="p-2 bg-[#1a1a24] border border-[#2a2a3a] rounded-lg hover:border-indigo-500/50 text-gray-400 hover:text-gray-200 transition-all"
+            className="p-2 bg-[#161628] border border-[#252542] rounded-lg hover:border-indigo-500/50 text-gray-400 hover:text-gray-200 transition-all"
           >
             <ChevronRight size={18} />
           </button>
@@ -177,7 +186,7 @@ export default function HabitsPage() {
       {showAddForm && (
         <form
           onSubmit={addHabit}
-          className="mb-6 bg-[#1a1a24] border border-[#2a2a3a] rounded-xl p-4 space-y-3"
+          className="mb-6 bg-[#161628] border border-[#252542] rounded-xl p-4 space-y-3"
         >
           <h3 className="text-sm font-medium text-gray-300">새 습관 추가</h3>
           <div className="flex gap-2">
@@ -185,7 +194,7 @@ export default function HabitsPage() {
               type="text"
               value={formData.emoji}
               onChange={(e) => setFormData((f) => ({ ...f, emoji: e.target.value }))}
-              className="w-12 bg-[#22222f] border border-[#2a2a3a] rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-indigo-500/50"
+              className="w-12 bg-[#1e1e35] border border-[#252542] rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:border-indigo-500/50"
               maxLength={2}
             />
             <input
@@ -193,7 +202,7 @@ export default function HabitsPage() {
               value={formData.name}
               onChange={(e) => setFormData((f) => ({ ...f, name: e.target.value }))}
               placeholder="습관 이름 (예: 물 2L 마시기)"
-              className="flex-1 bg-[#22222f] border border-[#2a2a3a] rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50"
+              className="flex-1 bg-[#1e1e35] border border-[#252542] rounded-lg px-3 py-2 text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-indigo-500/50"
               autoFocus
             />
           </div>
@@ -207,7 +216,7 @@ export default function HabitsPage() {
                   onClick={() => setFormData((f) => ({ ...f, color }))}
                   className={`w-7 h-7 rounded-full transition-all ${
                     formData.color === color
-                      ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1a1a24] scale-110'
+                      ? 'ring-2 ring-white ring-offset-2 ring-offset-[#161628] scale-110'
                       : ''
                   }`}
                   style={{ backgroundColor: color }}
@@ -219,7 +228,7 @@ export default function HabitsPage() {
             <button
               type="button"
               onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 bg-[#22222f] border border-[#2a2a3a] hover:border-gray-600 text-gray-400 text-sm rounded-lg transition-colors"
+              className="px-4 py-2 bg-[#1e1e35] border border-[#252542] hover:border-gray-600 text-gray-400 text-sm rounded-lg transition-colors"
             >
               취소
             </button>
@@ -236,14 +245,14 @@ export default function HabitsPage() {
 
       {/* Stats bar */}
       {habits.length > 0 && !loading && (
-        <div className="mb-6 bg-[#1a1a24] border border-[#2a2a3a] rounded-xl p-4">
+        <div className="mb-6 bg-[#161628] border border-[#252542] rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-gray-400">오늘의 달성률</span>
             <span className="text-lg font-bold text-gray-200">
               {completedCount}/{habits.length}
             </span>
           </div>
-          <div className="w-full bg-[#22222f] rounded-full h-2.5">
+          <div className="w-full bg-[#1e1e35] rounded-full h-2.5">
             <div
               className="h-2.5 rounded-full transition-all duration-700"
               style={{
@@ -264,7 +273,7 @@ export default function HabitsPage() {
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-[#1a1a24] border border-[#2a2a3a] rounded-xl h-16 animate-pulse" />
+            <div key={i} className="bg-[#161628] border border-[#252542] rounded-xl h-20 animate-pulse" />
           ))}
         </div>
       ) : habits.length === 0 ? (
@@ -286,45 +295,75 @@ export default function HabitsPage() {
             return (
               <div
                 key={habit.id}
-                className={`flex items-center gap-4 bg-[#1a1a24] border rounded-xl px-4 py-3 transition-all group ${
+                className={`bg-[#161628] border rounded-xl px-4 py-3 transition-all group ${
                   isCompleted
-                    ? 'border-emerald-500/20 bg-emerald-500/5'
-                    : 'border-[#2a2a3a] hover:border-[#3a3a4a]'
+                    ? 'border-emerald-500/20 bg-emerald-500/[0.05]'
+                    : 'border-[#252542] hover:border-[#353560]'
                 }`}
               >
-                <button
-                  onClick={() => toggleHabit(habit.id)}
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                    isCompleted
-                      ? 'border-emerald-500 bg-emerald-500'
-                      : 'border-gray-600 hover:border-emerald-400'
-                  }`}
-                  style={isCompleted ? {} : { borderColor: habit.color + '60' }}
-                >
-                  {isCompleted && <Check size={14} className="text-white" />}
-                </button>
-
-                <div className="flex items-center gap-2 flex-1">
-                  <span className="text-xl">{habit.emoji || '✨'}</span>
-                  <span
-                    className={`font-medium ${
-                      isCompleted ? 'line-through text-gray-600' : 'text-gray-200'
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => toggleHabit(habit.id)}
+                    className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                      isCompleted
+                        ? 'border-emerald-500 bg-emerald-500'
+                        : 'border-gray-600 hover:border-emerald-400'
                     }`}
+                    style={isCompleted ? {} : { borderColor: habit.color + '80' }}
                   >
-                    {habit.name}
-                  </span>
+                    {isCompleted && <Check size={14} className="text-white" />}
+                  </button>
+
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-xl flex-shrink-0">{habit.emoji || '✨'}</span>
+                    <span
+                      className={`font-medium truncate ${
+                        isCompleted ? 'line-through text-gray-600' : 'text-gray-200'
+                      }`}
+                    >
+                      {habit.name}
+                    </span>
+                  </div>
+
+                  {/* Streak badge */}
+                  {habit.streak > 0 && (
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-500/15 border border-orange-500/25 rounded-full flex-shrink-0">
+                      <Flame size={11} className="text-orange-400" />
+                      <span className="text-xs font-semibold text-orange-300">{habit.streak}</span>
+                    </div>
+                  )}
+
+                  {isCompleted && (
+                    <span className="text-xs text-emerald-500 font-medium flex-shrink-0">완료 ✓</span>
+                  )}
+
+                  <button
+                    onClick={() => deleteHabit(habit.id)}
+                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all flex-shrink-0"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
 
-                {isCompleted && (
-                  <span className="text-xs text-emerald-500 font-medium">완료 ✓</span>
+                {/* Week history dots */}
+                {habit.weekHistory && (
+                  <div className="flex items-center gap-1 mt-2.5 pl-9">
+                    {habit.weekHistory.map((day, i) => (
+                      <div key={i} className="flex flex-col items-center gap-0.5">
+                        <div
+                          className={`w-4 h-4 rounded-sm transition-colors ${
+                            day.completed
+                              ? 'opacity-100'
+                              : 'bg-[#252542] opacity-60'
+                          }`}
+                          style={day.completed ? { backgroundColor: habit.color } : {}}
+                          title={day.date}
+                        />
+                        <span className="text-[8px] text-[#4a4a90]">{WEEK_LABELS[i]}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
-
-                <button
-                  onClick={() => deleteHabit(habit.id)}
-                  className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all"
-                >
-                  <Trash2 size={14} />
-                </button>
               </div>
             )
           })}

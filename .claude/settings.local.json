@@ -11,7 +11,8 @@
       "Bash(nvm use:*)",
       "Bash(npm rebuild:*)",
       "Bash(source ~/.nvm/nvm.sh)",
-      "Bash(nvm install:*)"
+      "Bash(nvm install:*)",
+      "Bash(npx jest:*)"
     ]
   }
 }

@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, Check, X } from 'lucide-react'
 import AIFeedback from './AIFeedback'
+import {
+  FIRST_HOUR, LAST_HOUR, ROW_H, SNAP, TOTAL_H,
+  timeToY, yToTime, addOneHour, nowToY,
+} from '@/lib/timeUtils'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Todo {
@@ -24,41 +28,21 @@ interface TimelineEntry {
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const FIRST_HOUR = 5
-const LAST_HOUR = 23
-const ROW_H = 52          // px per hour
-const SNAP = 15           // snap to 15-min
-const TOTAL_H = (LAST_HOUR - FIRST_HOUR + 1) * ROW_H
 const HOURS = Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, i) => i + FIRST_HOUR)
 const DAYS_KO = ['월', '화', '수', '목', '금', '토', '일']
 
 const CAT_CLS: Record<string, string> = {
-  work:     'bg-indigo-500/30 text-indigo-100 border-indigo-400/50',
-  personal: 'bg-emerald-500/30 text-emerald-100 border-emerald-400/50',
-  exercise: 'bg-orange-500/30 text-orange-100 border-orange-400/50',
-  study:    'bg-blue-500/30 text-blue-100 border-blue-400/50',
+  work:     'bg-indigo-500/25 text-indigo-100 border-indigo-400/40',
+  personal: 'bg-emerald-500/25 text-emerald-100 border-emerald-400/40',
+  exercise: 'bg-orange-500/25 text-orange-100 border-orange-400/40',
+  study:    'bg-blue-500/25 text-blue-100 border-blue-400/40',
 }
 const DEF_CLS = 'bg-[#2a2a50] text-[#c0c0e0] border-[#3a3a68]'
 
-// ── Time helpers ───────────────────────────────────────────────────────────
-function timeToY(time: string): number {
-  const [h, m] = time.split(':').map(Number)
-  return (h - FIRST_HOUR) * ROW_H + (m / 60) * ROW_H
-}
-
-function yToTime(y: number): string {
-  const clamped = Math.max(0, Math.min(y, TOTAL_H - ROW_H / 4))
-  const totalMin = clamped / ROW_H * 60
-  const snapped = Math.round(totalMin / SNAP) * SNAP
-  const h = FIRST_HOUR + Math.floor(snapped / 60)
-  const m = snapped % 60
-  const clampH = Math.min(LAST_HOUR, Math.max(FIRST_HOUR, h))
-  return `${String(clampH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
-function addOneHour(time: string): string {
-  const [h, m] = time.split(':').map(Number)
-  return `${String(Math.min(LAST_HOUR, h + 1)).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+const PRIORITY_DOT: Record<string, string> = {
+  high:   'bg-red-400',
+  medium: 'bg-amber-400',
+  low:    'bg-emerald-400',
 }
 
 // ── Entry block component ──────────────────────────────────────────────────
@@ -77,7 +61,7 @@ function EntryBlock({ entry, onDelete, onDragStart }: EntryBlockProps) {
   return (
     <div
       style={{ position: 'absolute', top, left: 3, right: 3, height, zIndex: 10 }}
-      className={`rounded border text-[10px] overflow-hidden group select-none ${cls}`}
+      className={`rounded-lg border text-[10px] overflow-hidden group select-none ${cls}`}
       onMouseDown={e => { e.stopPropagation(); onDragStart(e, 'move') }}
     >
       <div className="px-1.5 pt-0.5 pb-4 h-full overflow-hidden cursor-grab active:cursor-grabbing">
@@ -118,12 +102,19 @@ export default function WeeklyBoard() {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [now, setNow] = useState(new Date())
 
   const [addingTodoDay, setAddingTodoDay] = useState<string | null>(null)
   const [newTodoTitle, setNewTodoTitle] = useState('')
 
   const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number } | null>(null)
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
+
+  // Current time indicator
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000)
+    return () => clearInterval(timer)
+  }, [])
 
   // drag refs
   const dragRef = useRef<{
@@ -133,7 +124,7 @@ export default function WeeklyBoard() {
     startY: number
     durationPx: number
   } | null>(null)
-  const didDragRef = useRef(false)  // suppresses click after drag
+  const didDragRef = useRef(false)
   const timelineRef = useRef<TimelineEntry[]>([])
   useEffect(() => { timelineRef.current = timeline }, [timeline])
 
@@ -278,10 +269,8 @@ export default function WeeklyBoard() {
       document.removeEventListener('mouseup', onUp)
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
-      // reset didDragRef after click event has fired
       setTimeout(() => { didDragRef.current = false }, 0)
 
-      // save to API using ref to get latest state
       if (!drag.entryId.startsWith('temp-')) {
         const updated = timelineRef.current.find(t => t.id === drag.entryId)
         if (updated) {
@@ -308,6 +297,8 @@ export default function WeeklyBoard() {
     timeline.filter(e => isSameDay(new Date(e.date), day))
 
   const weekLabel = `${format(currentWeekStart, 'yyyy.MM.dd')} — ${format(addDays(currentWeekStart, 6), 'MM.dd')}`
+
+  const nowY = nowToY(now)
 
   // ── Render ────────────────────────────────────────────────────────────────
   const gridCols = `44px repeat(7, minmax(0, 1fr))`
@@ -345,30 +336,30 @@ export default function WeeklyBoard() {
       )}
 
       {/* Grid */}
-      <div className="flex-1 overflow-auto rounded-xl border border-[#28285a]" style={{ minWidth: 0 }}>
+      <div className="flex-1 overflow-auto rounded-xl border border-[#252542]" style={{ minWidth: 0 }}>
         <div style={{ display: 'grid', gridTemplateColumns: gridCols, minWidth: '760px' }}>
 
           {/* ── Day headers (sticky) ── */}
-          <div className="sticky top-0 z-30 bg-[#1c1c3a] border-b border-[#28285a]" />
+          <div className="sticky top-0 z-30 bg-[#161628] border-b border-[#252542]" />
           {weekDays.map((day, i) => {
             const today = isToday(day)
             return (
               <div key={i}
-                className={`sticky top-0 z-30 border-l border-b border-[#28285a] px-2 py-2 ${today ? 'bg-indigo-900/40' : 'bg-[#1c1c3a]'}`}>
-                <div className={`text-[10px] font-medium ${today ? 'text-indigo-400' : i >= 5 ? 'text-rose-400/80' : 'text-[#7070a8]'}`}>
+                className={`sticky top-0 z-30 border-l border-b border-[#252542] px-2 py-2 ${today ? 'bg-indigo-900/40' : 'bg-[#161628]'}`}>
+                <div className={`text-[10px] font-semibold tracking-wide ${today ? 'text-indigo-400' : i >= 5 ? 'text-rose-400/70' : 'text-[#7070a8]'}`}>
                   {DAYS_KO[i]}
                 </div>
                 <div className={`text-xl font-bold leading-tight ${today ? 'text-indigo-300' : 'text-[#ddddf5]'}`}>
                   {format(day, 'd')}
                 </div>
-                <div className="text-[9px] text-[#5050a0]">{format(day, 'MM/dd')}</div>
+                <div className="text-[9px] text-[#4a4a90]">{format(day, 'MM/dd')}</div>
               </div>
             )
           })}
 
           {/* ── To-do section ── */}
-          <div className="bg-[#191932] border-b border-[#28285a] flex items-start justify-end pr-1.5 pt-2">
-            <span className="text-[9px] text-[#5050a0] tracking-wider">To-do</span>
+          <div className="bg-[#111124] border-b border-[#252542] flex items-start justify-end pr-1.5 pt-2">
+            <span className="text-[9px] text-[#4a4a90] tracking-widest">TO-DO</span>
           </div>
           {weekDays.map((day, i) => {
             const dayKey = format(day, 'yyyy-MM-dd')
@@ -377,7 +368,7 @@ export default function WeeklyBoard() {
             const today = isToday(day)
             return (
               <div key={i}
-                className={`border-l border-b border-[#28285a] p-1.5 ${today ? 'bg-indigo-500/[0.10]' : 'bg-[#191932]'}`}
+                className={`border-l border-b border-[#252542] p-1.5 ${today ? 'bg-indigo-500/[0.08]' : 'bg-[#111124]'}`}
                 style={{ minHeight: 80 }}>
                 {loading ? (
                   <div className="text-[10px] text-gray-700 text-center pt-5">···</div>
@@ -390,7 +381,9 @@ export default function WeeklyBoard() {
                           className={`mt-[2px] w-3.5 h-3.5 rounded-sm border flex-shrink-0 flex items-center justify-center transition-all ${todo.completed ? 'bg-indigo-600 border-indigo-600' : 'border-[#3a3a6a] hover:border-indigo-400/60'}`}>
                           {todo.completed && <Check size={8} className="text-white" />}
                         </button>
-                        <span className={`text-[11px] leading-4 flex-1 min-w-0 break-words ${todo.completed ? 'line-through text-[#5050a0]' : 'text-[#d0d0f0]'}`}>
+                        {/* Priority dot */}
+                        <div className={`mt-[5px] w-1.5 h-1.5 rounded-full flex-shrink-0 ${PRIORITY_DOT[todo.priority] ?? PRIORITY_DOT.medium} ${todo.completed ? 'opacity-30' : 'opacity-80'}`} />
+                        <span className={`text-[11px] leading-4 flex-1 min-w-0 break-words ${todo.completed ? 'line-through text-[#4a4a90]' : 'text-[#d0d0f0]'}`}>
                           {todo.title}
                         </span>
                         <button onClick={() => deleteTodo(todo.id)}
@@ -408,14 +401,14 @@ export default function WeeklyBoard() {
                             if (e.key === 'Escape') { setAddingTodoDay(null); setNewTodoTitle('') }
                           }}
                           placeholder="할일..."
-                          className="flex-1 min-w-0 bg-[#242450] border border-indigo-500/30 rounded px-1.5 py-0.5 text-[11px] text-[#ddddf5] placeholder-[#4040a0] focus:outline-none"
+                          className="flex-1 min-w-0 bg-[#1e1e42] border border-indigo-500/30 rounded px-1.5 py-0.5 text-[11px] text-[#ddddf5] placeholder-[#4040a0] focus:outline-none"
                           autoFocus />
                         <button onClick={() => submitTodo(day)} className="text-indigo-400 hover:text-indigo-300 flex-shrink-0"><Check size={11} /></button>
                         <button onClick={() => { setAddingTodoDay(null); setNewTodoTitle('') }} className="text-[#5050a0] hover:text-gray-400 flex-shrink-0"><X size={11} /></button>
                       </div>
                     ) : (
                       <button onClick={() => { setAddingTodoDay(dayKey); setNewTodoTitle('') }}
-                        className="flex items-center gap-0.5 text-[10px] text-gray-700 hover:text-indigo-400 transition-colors mt-0.5 px-0.5">
+                        className="flex items-center gap-0.5 text-[10px] text-[#4a4a90] hover:text-indigo-400 transition-colors mt-0.5 px-0.5">
                         <Plus size={10} /><span>추가</span>
                       </button>
                     )}
@@ -427,18 +420,18 @@ export default function WeeklyBoard() {
 
           {/* ── Timeline separator ── */}
           <div style={{ gridColumn: '1 / -1' }}
-            className="flex items-center gap-2 bg-[#14142e] border-b border-[#252532] px-3 py-1">
-            <div className="w-1 h-1 rounded-full bg-indigo-500/50" />
-            <span className="text-[9px] text-[#5050a0] tracking-[0.2em] uppercase">타임라인</span>
+            className="flex items-center gap-2 bg-[#0e0e20] border-b border-[#202030] px-3 py-1">
+            <div className="w-1 h-1 rounded-full bg-indigo-500/60" />
+            <span className="text-[9px] text-[#4a4a90] tracking-[0.2em] uppercase">타임라인</span>
           </div>
 
           {/* ── Timeline body ── */}
           {/* Time labels */}
-          <div style={{ position: 'relative', height: TOTAL_H }} className="bg-[#14142e] border-r border-[#28285a]">
+          <div style={{ position: 'relative', height: TOTAL_H }} className="bg-[#0e0e20] border-r border-[#252542]">
             {HOURS.map(hour => (
               <div key={hour}
                 style={{ position: 'absolute', top: (hour - FIRST_HOUR) * ROW_H + 3, right: 6 }}
-                className="text-[10px] text-[#5050a0] font-mono tabular-nums leading-none">
+                className="text-[10px] text-[#4a4a90] font-mono tabular-nums leading-none">
                 {String(hour).padStart(2, '0')}
               </div>
             ))}
@@ -455,7 +448,7 @@ export default function WeeklyBoard() {
               <div key={di}
                 ref={el => { columnRefs.current[di] = el }}
                 style={{ position: 'relative', height: TOTAL_H }}
-                className={`border-l border-[#28285a] ${today ? 'bg-indigo-500/[0.07]' : 'bg-[#14142e]'}`}
+                className={`border-l border-[#252542] ${today ? 'bg-indigo-500/[0.06]' : 'bg-[#0e0e20]'}`}
                 onClick={e => {
                   if (isAddingHere || didDragRef.current) return
                   const rect = e.currentTarget.getBoundingClientRect()
@@ -469,13 +462,25 @@ export default function WeeklyBoard() {
                 {HOURS.map(hour => (
                   <div key={hour}
                     style={{ position: 'absolute', top: (hour - FIRST_HOUR) * ROW_H, left: 0, right: 0, height: ROW_H }}
-                    className="border-b border-[#222248] pointer-events-none"
+                    className="border-b border-[#1c1c30] pointer-events-none"
                   >
-                    {/* half-hour line */}
                     <div style={{ position: 'absolute', top: ROW_H / 2, left: 0, right: 0 }}
-                      className="border-b border-[#1c1c38] pointer-events-none" />
+                      className="border-b border-[#161626] pointer-events-none" />
                   </div>
                 ))}
+
+                {/* Current time indicator */}
+                {today && nowY !== null && (
+                  <div
+                    style={{ position: 'absolute', top: nowY, left: 0, right: 0, zIndex: 20 }}
+                    className="pointer-events-none"
+                  >
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0 -ml-1 shadow-[0_0_6px_rgba(248,113,113,0.8)]" />
+                      <div className="flex-1 h-px bg-red-400/60" />
+                    </div>
+                  </div>
+                )}
 
                 {/* Entries */}
                 {dayEntries.map(entry => (
@@ -495,7 +500,7 @@ export default function WeeklyBoard() {
                       top: Math.max(0, (addingEntry!.hour - FIRST_HOUR) * ROW_H),
                       left: 3, right: 3, zIndex: 30,
                     }}
-                    className="bg-[#1e1e42] border border-indigo-500/40 rounded-lg p-2 shadow-xl"
+                    className="bg-[#1a1a3a] border border-indigo-500/40 rounded-xl p-2 shadow-2xl"
                     onClick={e => e.stopPropagation()}
                   >
                     <input type="text" value={newEntry.title}

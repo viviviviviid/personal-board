@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { startOfDay, endOfDay } from 'date-fns'
+import { startOfDay, endOfDay, subDays } from 'date-fns'
+import { computeStreak, getWeekHistory } from '@/lib/habitUtils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,15 +15,33 @@ export async function GET(request: NextRequest) {
         logs: {
           where: {
             date: {
-              gte: startOfDay(date),
+              gte: startOfDay(subDays(date, 90)),
               lte: endOfDay(date),
             },
           },
+          orderBy: { date: 'desc' },
         },
       },
     })
 
-    return NextResponse.json(habits)
+    const todayStart = startOfDay(date)
+    const todayEnd = endOfDay(date)
+
+    const result = habits.map(habit => {
+      const todayLogs = habit.logs.filter(
+        l => l.date >= todayStart && l.date <= todayEnd
+      )
+      const streak = computeStreak(habit.logs, date)
+      const weekHistory = getWeekHistory(habit.logs, date)
+      return {
+        ...habit,
+        logs: todayLogs,
+        streak,
+        weekHistory,
+      }
+    })
+
+    return NextResponse.json(result)
   } catch (error) {
     console.error('Failed to fetch habits:', error)
     return NextResponse.json({ error: 'DB 연결에 실패했습니다.' }, { status: 500 })
