@@ -12,7 +12,13 @@
       "Bash(npm rebuild:*)",
       "Bash(source ~/.nvm/nvm.sh)",
       "Bash(nvm install:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "WebSearch",
+      "WebFetch(domain:www.schemecolor.com)",
+      "WebFetch(domain:icolorpalette.com)",
+      "WebFetch(domain:www.media.io)",
+      "WebFetch(domain:www.color-hex.com)",
+      "WebFetch(domain:daintyaesthetic.com)"
     ]
   }
 }

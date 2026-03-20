@@ -1,16 +1,38 @@
 @import "tailwindcss";
 
+/* ── Notebook Dark Palette ───────────────────────────────────────────────── */
 :root {
-  --bg-base:    #0a0a1a;
-  --bg-surface: #111124;
-  --bg-card:    #161628;
-  --bg-input:   #1e1e35;
-  --border:     #252542;
-  --border-dim: #1e1e38;
-  --text:       #e4e4f8;
-  --text-muted: #8888bb;
-  --text-dim:   #4a4a90;
-  --primary:    #6366f1;
+  /* Backgrounds — espresso to worn leather */
+  --bg-base:      #1a150f;   /* darkest: moleskine cover */
+  --bg-surface:   #231d14;   /* page background */
+  --bg-card:      #2d2619;   /* card: aged paper */
+  --bg-input:     #352e20;   /* input field */
+  --bg-hover:     #3d3526;   /* hover state */
+
+  /* Borders — aged ink lines */
+  --border:       #4a4130;
+  --border-dim:   #38321f;
+  --border-rule:  #2e2818;   /* subtle rule lines */
+
+  /* Text — fresh to faded ink */
+  --text:         #ddd0b8;   /* parchment — body */
+  --text-bright:  #f2e8d4;   /* cream — headings */
+  --text-muted:   #9a8e78;   /* aged ink */
+  --text-dim:     #5e5440;   /* faded pencil */
+
+  /* Accent — antique gold / amber */
+  --accent:       #c78928;
+  --accent-light: #f2c063;
+  --accent-dim:   #8a5e18;
+
+  /* Status */
+  --success:      #95a586;   /* sage green */
+  --success-dim:  #4a6a40;
+  --danger:       #a85848;   /* muted red */
+  --warning:      #c4935a;   /* warm orange */
+
+  /* Font */
+  --font-hand:    var(--font-caveat), 'Caveat', sans-serif;
 }
 
 @theme inline {
@@ -24,28 +46,40 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
 }
 
+/* Handwriting font utility */
+.font-hand {
+  font-family: var(--font-hand);
+}
+
+/* Paper-line background for timeline areas */
+.paper-lines {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 51px,
+    var(--border-rule) 51px,
+    var(--border-rule) 52px
+  );
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #2a2a50;
+  background: var(--border);
   border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #4040a0;
+  background: var(--accent-dim);
 }
-
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a2a50 transparent;
+  scrollbar-color: var(--border) transparent;
 }
 
 .line-through {

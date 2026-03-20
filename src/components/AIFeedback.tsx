@@ -26,12 +26,11 @@ export default function AIFeedback({ weekStart }: AIFeedbackProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ weekStart: format(weekStart, 'yyyy-MM-dd') }),
       })
-
       if (!res.ok) throw new Error('Failed to get feedback')
       const data = await res.json()
       setFeedback(data.feedback)
     } catch {
-      setError('AI 피드백을 가져오는 데 실패했습니다. 잠시 후 다시 시도해 주세요.')
+      setError('AI 피드백을 가져오는 데 실패했습니다.')
     } finally {
       setLoading(false)
     }
@@ -41,22 +40,22 @@ export default function AIFeedback({ weekStart }: AIFeedbackProps) {
     return text.split('\n').map((line, i) => {
       if (line.startsWith('## ')) {
         return (
-          <h3 key={i} className="text-base font-semibold text-indigo-400 mt-4 mb-2 first:mt-0">
+          <h3 key={i} className="text-base font-semibold mt-5 mb-2 first:mt-0" style={{ color: 'var(--accent-light)' }}>
             {line.replace('## ', '')}
           </h3>
         )
       }
       if (line.startsWith('- ') || line.startsWith('• ')) {
         return (
-          <div key={i} className="flex gap-2 text-sm text-gray-300 mb-1">
-            <span className="text-indigo-400 mt-0.5">•</span>
+          <div key={i} className="flex gap-2 text-sm mb-1.5" style={{ color: 'var(--text)' }}>
+            <span style={{ color: 'var(--accent)' }} className="mt-0.5 flex-shrink-0">•</span>
             <span>{line.replace(/^[-•] /, '')}</span>
           </div>
         )
       }
-      if (line.trim() === '') return <div key={i} className="h-1" />
+      if (line.trim() === '') return <div key={i} className="h-2" />
       return (
-        <p key={i} className="text-sm text-gray-300 mb-1">
+        <p key={i} className="text-sm mb-1.5" style={{ color: 'var(--text)' }}>
           {line}
         </p>
       )
@@ -68,62 +67,95 @@ export default function AIFeedback({ weekStart }: AIFeedbackProps) {
       <button
         onClick={getFeedback}
         title="AI 주간 피드백"
-        className="p-1.5 bg-[#1c1c3a] border border-[#28285a] rounded-lg hover:border-indigo-500/50 text-[#8888bb] hover:text-indigo-400 transition-all"
+        className="p-1.5 rounded-lg transition-all"
+        style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          color: 'var(--text-muted)',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-light)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
       >
-        <Sparkles size={16} />
+        <Sparkles size={15} />
       </button>
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 backdrop-blur-sm"
+            style={{ background: 'rgba(10,8,4,0.7)' }}
             onClick={() => setIsOpen(false)}
           />
-          <div className="relative bg-[#1a1a24] border border-[#2a2a3a] rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#2a2a3a]">
+          <div
+            className="relative w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl rounded-2xl overflow-hidden"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+            }}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-5 py-4"
+              style={{ borderBottom: '1px solid var(--border-dim)' }}
+            >
               <div className="flex items-center gap-2">
-                <Sparkles size={18} className="text-indigo-400" />
-                <h2 className="text-base font-semibold text-gray-200">AI 주간 피드백</h2>
+                <Sparkles size={16} style={{ color: 'var(--accent)' }} />
+                <h2 className="text-base font-semibold" style={{ color: 'var(--text-bright)' }}>
+                  AI 주간 피드백
+                </h2>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-600">
+              <div className="flex items-center gap-3">
+                <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
                   {format(weekStart, 'MM/dd')} 주
                 </span>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1 hover:bg-[#22222f] rounded-lg text-gray-500 hover:text-gray-300 transition-colors"
+                  className="p-1 rounded-lg transition-colors"
+                  style={{ color: 'var(--text-dim)' }}
                 >
                   <X size={16} />
                 </button>
               </div>
             </div>
 
+            {/* Body */}
             <div className="flex-1 overflow-y-auto p-5">
               {loading && (
                 <div className="flex flex-col items-center justify-center py-12 gap-3">
-                  <Loader2 size={32} className="text-indigo-400 animate-spin" />
-                  <p className="text-sm text-gray-500">AI가 이번 주를 분석하고 있어요...</p>
+                  <Loader2 size={28} className="animate-spin" style={{ color: 'var(--accent)' }} />
+                  <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                    이번 주를 분석하고 있어요...
+                  </p>
                 </div>
               )}
-
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                  <p className="text-sm text-red-400">{error}</p>
+                <div
+                  className="rounded-xl p-4 text-sm"
+                  style={{
+                    background: 'rgba(168,88,72,0.1)',
+                    border: '1px solid rgba(168,88,72,0.3)',
+                    color: 'var(--danger)',
+                  }}
+                >
+                  {error}
                 </div>
               )}
-
               {feedback && !loading && (
-                <div className="prose prose-invert max-w-none">
-                  {formatFeedback(feedback)}
-                </div>
+                <div>{formatFeedback(feedback)}</div>
               )}
             </div>
 
             {feedback && !loading && (
-              <div className="px-5 py-3 border-t border-[#2a2a3a]">
+              <div
+                className="px-5 py-3"
+                style={{ borderTop: '1px solid var(--border-dim)' }}
+              >
                 <button
                   onClick={getFeedback}
-                  className="text-xs text-gray-600 hover:text-indigo-400 transition-colors"
+                  className="text-xs transition-colors"
+                  style={{ color: 'var(--text-dim)' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
                 >
                   다시 생성하기
                 </button>

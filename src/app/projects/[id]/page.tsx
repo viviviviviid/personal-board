@@ -31,9 +31,14 @@ interface Project {
   todos: Todo[]
 }
 
-// Sentinel: '__none__' = no form open, 'unsectioned' = open for unsectioned, sectionId = open for section
 const CLOSED = '__none__'
 const UNSECTIONED = 'unsectioned'
+
+const PRIORITY_COLOR: Record<string, string> = {
+  high: '#a85848',
+  medium: '#c4935a',
+  low: '#95a586',
+}
 
 export default function ProjectDetailPage() {
   const params = useParams()
@@ -67,38 +72,24 @@ export default function ProjectDetailPage() {
     }
   }, [projectId, router])
 
-  useEffect(() => {
-    fetchProject()
-  }, [fetchProject])
+  useEffect(() => { fetchProject() }, [fetchProject])
 
   const toggleSection = (sectionId: string) => {
     setOpenSections((prev) => {
       const next = new Set(prev)
-      if (next.has(sectionId)) {
-        next.delete(sectionId)
-      } else {
-        next.add(sectionId)
-      }
+      next.has(sectionId) ? next.delete(sectionId) : next.add(sectionId)
       return next
     })
   }
 
   const toggleTodo = async (todoId: string, currentCompleted: boolean) => {
     if (!project) return
-
-    const updateTodo = (t: Todo) =>
-      t.id === todoId ? { ...t, completed: !currentCompleted } : t
-
-    setProject((p) =>
-      p
-        ? {
-            ...p,
-            todos: p.todos.map(updateTodo),
-            sections: p.sections.map((s) => ({ ...s, todos: s.todos.map(updateTodo) })),
-          }
-        : p
-    )
-
+    const update = (t: Todo) => t.id === todoId ? { ...t, completed: !currentCompleted } : t
+    setProject((p) => p ? {
+      ...p,
+      todos: p.todos.map(update),
+      sections: p.sections.map((s) => ({ ...s, todos: s.todos.map(update) })),
+    } : p)
     try {
       await fetch(`/api/todos/${todoId}`, {
         method: 'PATCH',
@@ -112,20 +103,11 @@ export default function ProjectDetailPage() {
 
   const deleteTodo = async (todoId: string) => {
     if (!project) return
-
-    setProject((p) =>
-      p
-        ? {
-            ...p,
-            todos: p.todos.filter((t) => t.id !== todoId),
-            sections: p.sections.map((s) => ({
-              ...s,
-              todos: s.todos.filter((t) => t.id !== todoId),
-            })),
-          }
-        : p
-    )
-
+    setProject((p) => p ? {
+      ...p,
+      todos: p.todos.filter((t) => t.id !== todoId),
+      sections: p.sections.map((s) => ({ ...s, todos: s.todos.filter((t) => t.id !== todoId) })),
+    } : p)
     try {
       await fetch(`/api/todos/${todoId}`, { method: 'DELETE' })
     } catch {
@@ -135,30 +117,16 @@ export default function ProjectDetailPage() {
 
   const addTodo = async (key: string) => {
     if (!newTodoTitle.trim() || !project) return
-
     const actualSectionId = key === UNSECTIONED ? null : key
     const tempId = `temp-${Date.now()}`
-    const newTodo: Todo = {
-      id: tempId,
-      title: newTodoTitle.trim(),
-      completed: false,
-      priority: 'medium',
-      sectionId: actualSectionId,
-    }
+    const newTodo: Todo = { id: tempId, title: newTodoTitle.trim(), completed: false, priority: 'medium', sectionId: actualSectionId }
 
-    setProject((p) =>
-      p
-        ? actualSectionId
-          ? {
-              ...p,
-              sections: p.sections.map((s) =>
-                s.id === actualSectionId ? { ...s, todos: [...s.todos, newTodo] } : s
-              ),
-            }
-          : { ...p, todos: [...p.todos, newTodo] }
-        : p
+    setProject((p) => p
+      ? actualSectionId
+        ? { ...p, sections: p.sections.map((s) => s.id === actualSectionId ? { ...s, todos: [...s.todos, newTodo] } : s) }
+        : { ...p, todos: [...p.todos, newTodo] }
+      : p
     )
-
     setNewTodoTitle('')
     setAddingFor(CLOSED)
 
@@ -166,27 +134,15 @@ export default function ProjectDetailPage() {
       const res = await fetch('/api/todos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newTodo.title,
-          projectId: project.id,
-          sectionId: actualSectionId,
-        }),
+        body: JSON.stringify({ title: newTodo.title, projectId: project.id, sectionId: actualSectionId }),
       })
       if (!res.ok) throw new Error('Failed')
       const created = await res.json()
-
-      setProject((p) =>
-        p
-          ? {
-              ...p,
-              todos: p.todos.map((t) => (t.id === tempId ? created : t)),
-              sections: p.sections.map((s) => ({
-                ...s,
-                todos: s.todos.map((t) => (t.id === tempId ? created : t)),
-              })),
-            }
-          : p
-      )
+      setProject((p) => p ? {
+        ...p,
+        todos: p.todos.map((t) => (t.id === tempId ? created : t)),
+        sections: p.sections.map((s) => ({ ...s, todos: s.todos.map((t) => (t.id === tempId ? created : t)) })),
+      } : p)
     } catch {
       fetchProject()
     }
@@ -195,7 +151,6 @@ export default function ProjectDetailPage() {
   const addSection = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newSectionTitle.trim() || !project) return
-
     try {
       const res = await fetch(`/api/projects/${projectId}/sections`, {
         method: 'POST',
@@ -216,7 +171,7 @@ export default function ProjectDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="text-gray-600">로딩 중...</div>
+        <div style={{ color: 'var(--text-dim)' }}>로딩 중...</div>
       </div>
     )
   }
@@ -224,43 +179,51 @@ export default function ProjectDetailPage() {
   if (error || !project) {
     return (
       <div className="flex flex-col items-center justify-center py-24">
-        <div className="text-red-400 mb-4">{error || '프로젝트를 찾을 수 없습니다.'}</div>
-        <Link href="/projects" className="text-indigo-400 hover:text-indigo-300 text-sm">
+        <div className="mb-4" style={{ color: 'var(--danger)' }}>{error || '프로젝트를 찾을 수 없습니다.'}</div>
+        <Link href="/projects" style={{ color: 'var(--accent)' }} className="text-sm">
           프로젝트 목록으로
         </Link>
       </div>
     )
   }
 
-  const allTodos = [
-    ...project.todos,
-    ...project.sections.flatMap((s) => s.todos),
-  ]
+  const allTodos = [...project.todos, ...project.sections.flatMap((s) => s.todos)]
   const completedCount = allTodos.filter((t) => t.completed).length
   const totalCount = allTodos.length
 
   const TodoItem = ({ todo }: { todo: Todo }) => (
-    <div className="flex items-center gap-2 group px-3 py-1.5 hover:bg-[#1a1a24] rounded-lg transition-colors">
+    <div
+      className="flex items-center gap-2 group px-3 py-1.5 rounded-lg transition-all"
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+    >
       <button
         onClick={() => toggleTodo(todo.id, todo.completed)}
-        className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
-          todo.completed
-            ? 'bg-indigo-600 border-indigo-600'
-            : 'border-[#3a3a4a] hover:border-indigo-500/50'
-        }`}
+        className="w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all"
+        style={{
+          background: todo.completed ? 'var(--accent-dim)' : 'transparent',
+          borderColor: todo.completed ? 'var(--accent)' : 'var(--border)',
+        }}
       >
-        {todo.completed && <Check size={10} className="text-white" />}
+        {todo.completed && <Check size={10} style={{ color: 'var(--accent-light)' }} />}
       </button>
+      {/* Priority dot */}
+      <div
+        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+        style={{ background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium, opacity: todo.completed ? 0.3 : 0.8 }}
+      />
       <span
-        className={`flex-1 text-sm ${
-          todo.completed ? 'line-through text-gray-600' : 'text-gray-300'
-        }`}
+        className="flex-1 text-sm"
+        style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
       >
         {todo.title}
       </span>
       <button
         onClick={() => deleteTodo(todo.id)}
-        className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all"
+        className="opacity-0 group-hover:opacity-100 transition-all"
+        style={{ color: 'var(--text-dim)' }}
+        onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
+        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
       >
         <Trash2 size={12} />
       </button>
@@ -269,52 +232,38 @@ export default function ProjectDetailPage() {
 
   const AddTodoInline = ({ forKey }: { forKey: string }) => {
     const isActive = addingFor === forKey
-
     if (!isActive) {
       return (
         <button
-          onClick={() => {
-            setAddingFor(forKey)
-            setNewTodoTitle('')
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-700 hover:text-indigo-400 transition-colors w-full"
+          onClick={() => { setAddingFor(forKey); setNewTodoTitle('') }}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs w-full transition-colors"
+          style={{ color: 'var(--text-dim)' }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
         >
-          <Plus size={12} />
-          <span>할일 추가</span>
+          <Plus size={12} /><span>할일 추가</span>
         </button>
       )
     }
-
     return (
       <div className="flex items-center gap-2 px-3 py-1.5">
-        <div className="w-4 h-4 rounded border border-[#3a3a4a] flex-shrink-0" />
+        <div className="w-4 h-4 rounded border flex-shrink-0" style={{ borderColor: 'var(--border)' }} />
+        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: PRIORITY_COLOR.medium, opacity: 0.8 }} />
         <input
           type="text"
           value={newTodoTitle}
           onChange={(e) => setNewTodoTitle(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') addTodo(forKey)
-            if (e.key === 'Escape') {
-              setAddingFor(CLOSED)
-              setNewTodoTitle('')
-            }
+            if (e.key === 'Escape') { setAddingFor(CLOSED); setNewTodoTitle('') }
           }}
           placeholder="할일 이름..."
-          className="flex-1 bg-transparent border-b border-indigo-500/30 py-0.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none"
+          className="flex-1 bg-transparent py-0.5 text-sm focus:outline-none"
+          style={{ borderBottom: '1px solid var(--accent-dim)', color: 'var(--text)' }}
           autoFocus
         />
-        <button onClick={() => addTodo(forKey)} className="text-indigo-400 hover:text-indigo-300">
-          <Check size={14} />
-        </button>
-        <button
-          onClick={() => {
-            setAddingFor(CLOSED)
-            setNewTodoTitle('')
-          }}
-          className="text-gray-600 hover:text-gray-400"
-        >
-          <X size={14} />
-        </button>
+        <button onClick={() => addTodo(forKey)} style={{ color: 'var(--accent)' }}><Check size={14} /></button>
+        <button onClick={() => { setAddingFor(CLOSED); setNewTodoTitle('') }} style={{ color: 'var(--text-dim)' }}><X size={14} /></button>
       </div>
     )
   }
@@ -325,44 +274,41 @@ export default function ProjectDetailPage() {
       <div className="mb-6">
         <Link
           href="/projects"
-          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-300 mb-4 transition-colors"
+          className="inline-flex items-center gap-1 text-sm mb-4 transition-colors"
+          style={{ color: 'var(--text-muted)' }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-bright)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
         >
-          <ChevronLeft size={16} />
-          프로젝트 목록
+          <ChevronLeft size={16} />프로젝트 목록
         </Link>
 
         <div className="flex items-start gap-4">
-          <div
-            className="w-1 self-stretch rounded-full flex-shrink-0"
-            style={{ backgroundColor: project.color }}
-          />
+          <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-100">{project.name}</h2>
+            <h2 className="text-2xl font-bold" style={{ color: 'var(--text-bright)' }}>{project.name}</h2>
             {project.description && (
-              <p className="text-sm text-gray-500 mt-1">{project.description}</p>
+              <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>{project.description}</p>
             )}
-
             {project.goal && (
-              <div className="mt-3 flex items-start gap-2 p-3 bg-[#1a1a24] border border-[#2a2a3a] rounded-xl max-w-2xl">
-                <Target size={16} className="text-indigo-400 mt-0.5 flex-shrink-0" />
+              <div
+                className="mt-3 flex items-start gap-2 p-3 rounded-xl max-w-2xl"
+                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+              >
+                <Target size={16} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }} />
                 <div>
-                  <div className="text-xs text-gray-600 mb-0.5">목표</div>
-                  <div className="text-sm text-gray-300">{project.goal}</div>
+                  <div className="text-xs mb-0.5" style={{ color: 'var(--text-dim)' }}>목표</div>
+                  <div className="text-sm" style={{ color: 'var(--text)' }}>{project.goal}</div>
                 </div>
               </div>
             )}
-
             <div className="mt-4 flex items-center gap-3 max-w-xs">
-              <div className="flex-1 bg-[#22222f] rounded-full h-2">
+              <div className="flex-1 rounded-full h-2" style={{ background: 'var(--bg-input)' }}>
                 <div
                   className="h-2 rounded-full transition-all"
-                  style={{
-                    width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%`,
-                    backgroundColor: project.color,
-                  }}
+                  style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%`, backgroundColor: project.color }}
                 />
               </div>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
                 {completedCount}/{totalCount} 완료
               </span>
             </div>
@@ -373,14 +319,15 @@ export default function ProjectDetailPage() {
       {/* Content */}
       <div className="max-w-2xl space-y-4">
         {/* Unsectioned todos */}
-        <div className="bg-[#1a1a24] border border-[#2a2a3a] rounded-xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-[#2a2a3a]">
-            <span className="text-sm font-medium text-gray-400">기본</span>
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+        >
+          <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--border-dim)' }}>
+            <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>기본</span>
           </div>
           <div className="py-1">
-            {project.todos.map((todo) => (
-              <TodoItem key={todo.id} todo={todo} />
-            ))}
+            {project.todos.map((todo) => <TodoItem key={todo.id} todo={todo} />)}
             <AddTodoInline forKey={UNSECTIONED} />
           </div>
         </div>
@@ -391,28 +338,28 @@ export default function ProjectDetailPage() {
           return (
             <div
               key={section.id}
-              className="bg-[#1a1a24] border border-[#2a2a3a] rounded-xl overflow-hidden"
+              className="rounded-xl overflow-hidden"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
             >
               <button
                 onClick={() => toggleSection(section.id)}
-                className="w-full flex items-center gap-2 px-4 py-3 border-b border-[#2a2a3a] hover:bg-[#22222f] transition-colors"
+                className="w-full flex items-center gap-2 px-4 py-3 transition-colors"
+                style={{ borderBottom: '1px solid var(--border-dim)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
               >
-                {isOpen ? (
-                  <ChevronDown size={16} className="text-gray-500" />
-                ) : (
-                  <ChevronRight size={16} className="text-gray-500" />
-                )}
-                <span className="text-sm font-medium text-gray-300">{section.title}</span>
-                <span className="ml-auto text-xs text-gray-600">
+                {isOpen
+                  ? <ChevronDown size={16} style={{ color: 'var(--text-dim)' }} />
+                  : <ChevronRight size={16} style={{ color: 'var(--text-dim)' }} />
+                }
+                <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{section.title}</span>
+                <span className="ml-auto text-xs" style={{ color: 'var(--text-dim)' }}>
                   {section.todos.filter((t) => t.completed).length}/{section.todos.length}
                 </span>
               </button>
-
               {isOpen && (
                 <div className="py-1">
-                  {section.todos.map((todo) => (
-                    <TodoItem key={todo.id} todo={todo} />
-                  ))}
+                  {section.todos.map((todo) => <TodoItem key={todo.id} todo={todo} />)}
                   <AddTodoInline forKey={section.id} />
                 </div>
               )}
@@ -428,28 +375,23 @@ export default function ProjectDetailPage() {
               value={newSectionTitle}
               onChange={(e) => setNewSectionTitle(e.target.value)}
               placeholder="섹션 이름..."
-              className="flex-1 bg-[#1a1a24] border border-indigo-500/30 rounded-xl px-4 py-2.5 text-sm text-gray-200 placeholder-gray-600 focus:outline-none"
+              className="flex-1 rounded-xl px-4 py-2.5 text-sm focus:outline-none"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--accent-dim)', color: 'var(--text)' }}
               autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setAddingSectionTitle(false)
-                  setNewSectionTitle('')
-                }
-              }}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setAddingSectionTitle(false); setNewSectionTitle('') } }}
             />
             <button
               type="submit"
-              className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-xl transition-colors"
+              className="px-4 py-2.5 text-sm rounded-xl"
+              style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent)', color: 'var(--accent-light)' }}
             >
               추가
             </button>
             <button
               type="button"
-              onClick={() => {
-                setAddingSectionTitle(false)
-                setNewSectionTitle('')
-              }}
-              className="px-4 py-2.5 bg-[#1a1a24] border border-[#2a2a3a] hover:border-gray-600 text-gray-400 text-sm rounded-xl transition-colors"
+              onClick={() => { setAddingSectionTitle(false); setNewSectionTitle('') }}
+              className="px-4 py-2.5 text-sm rounded-xl"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
             >
               취소
             </button>
@@ -457,10 +399,22 @@ export default function ProjectDetailPage() {
         ) : (
           <button
             onClick={() => setAddingSectionTitle(true)}
-            className="flex items-center gap-2 px-4 py-2.5 w-full bg-[#1a1a24] border border-dashed border-[#2a2a3a] hover:border-indigo-500/30 text-gray-600 hover:text-indigo-400 text-sm rounded-xl transition-all"
+            className="flex items-center gap-2 px-4 py-2.5 w-full text-sm rounded-xl transition-all"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px dashed var(--border)',
+              color: 'var(--text-dim)',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = 'var(--accent-dim)'
+              e.currentTarget.style.color = 'var(--accent)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'var(--border)'
+              e.currentTarget.style.color = 'var(--text-dim)'
+            }}
           >
-            <Plus size={16} />
-            섹션 추가
+            <Plus size={16} />섹션 추가
           </button>
         )}
       </div>
