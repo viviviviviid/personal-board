@@ -25,7 +25,21 @@
       "Bash(openssl rand:*)",
       "Bash(mysql -h 127.0.0.1 -P 3306 -u root -p12345678 personal_board -e \"SELECT id, provider, LEFT\\(access_token,30\\) as token, scope FROM Account LIMIT 5;\")",
       "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''next:'''', d[''''dependencies''''].get\\(''''next'''',''''''''\\)\\); print\\(''''next-auth:'''', d[''''dependencies''''].get\\(''''next-auth'''',''''''''\\)\\); print\\(''''prisma:'''', d[''''devDependencies''''].get\\(''''prisma'''',''''''''\\)\\)\")",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(mysql:*)",
+      "Bash(brew services:*)",
+      "Bash(/opt/homebrew/bin/mysql.server start:*)",
+      "Bash(/opt/homebrew/bin/mysql -u root -e \"SELECT VERSION\\(\\);\")",
+      "Read(//tmp/**)",
+      "Bash(/opt/homebrew/bin/mysql -u root --socket=/opt/homebrew/var/mysql/mysql.sock -e \"SELECT VERSION\\(\\);\")",
+      "Bash(/opt/homebrew/bin/mysql -u root -h 127.0.0.1 -P 3306 -e \"SHOW DATABASES;\" 2>&1)",
+      "Bash(/opt/homebrew/bin/mysql -u root -pyour_strong_root_password -h 127.0.0.1 -P 3306 -e \"SHOW DATABASES;\" 2>&1)",
+      "Bash(/opt/homebrew/bin/mysql -u root -pyour_strong_root_password -h 127.0.0.1 -P 3306 -e \"SHOW GRANTS FOR 'app_user'@'%';\" 2>&1)",
+      "Bash(grep -n \"loading\\\\|skeleton\\\\|Skeleton\\\\|···\\\\|로딩\" /Users/viviviviviid/Desktop/project/tool/calender-todo/src/app/projects/[id]/page.tsx)",
+      "Bash(head -20 grep -n \"loading\\\\|skeleton\\\\|Skeleton\\\\|···\\\\|로딩\" /Users/viviviviviid/Desktop/project/tool/calender-todo/src/components/MonthlyCalendar.tsx)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(curl -s http://localhost:3000/manifest.webmanifest)"
     ]
   }
 }
