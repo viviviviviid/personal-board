@@ -344,6 +344,35 @@ describe('createRecurringTimelineEntries', () => {
     expect(data[0].category).toBeNull()
   })
 
+  test('hideFromMonthly: true 전달 시 모든 row에 true', async () => {
+    const dates = generateDates('daily', [], undefined, START, START)
+    await createRecurringTimelineEntries(mockPrisma, RULE_ID, dates, { ...RULE, hideFromMonthly: true }, USER_ID)
+    const { data } = mockCreateMany.mock.calls[0][0]
+    expect(data[0].hideFromMonthly).toBe(true)
+  })
+
+  test('hideFromMonthly: false 전달 시 모든 row에 false', async () => {
+    const dates = generateDates('daily', [], undefined, START, START)
+    await createRecurringTimelineEntries(mockPrisma, RULE_ID, dates, { ...RULE, hideFromMonthly: false }, USER_ID)
+    const { data } = mockCreateMany.mock.calls[0][0]
+    expect(data[0].hideFromMonthly).toBe(false)
+  })
+
+  test('hideFromMonthly 미전달 시 기본값 false', async () => {
+    const dates = generateDates('daily', [], undefined, START, START)
+    await createRecurringTimelineEntries(mockPrisma, RULE_ID, dates, RULE, USER_ID)
+    const { data } = mockCreateMany.mock.calls[0][0]
+    expect(data[0].hideFromMonthly).toBe(false)
+  })
+
+  test('다수 row 모두 동일한 hideFromMonthly 값 공유', async () => {
+    const dates = generateDates('weekly', [1, 3], undefined, START, new Date('2026-03-29T00:00:00.000Z'))
+    await createRecurringTimelineEntries(mockPrisma, RULE_ID, dates, { ...RULE, hideFromMonthly: true }, USER_ID)
+    const { data } = mockCreateMany.mock.calls[0][0]
+    expect(data).toHaveLength(2)
+    data.forEach((row: any) => expect(row.hideFromMonthly).toBe(true))
+  })
+
   test('타임라인 + TODO 동시 반복 시나리오: 같은 dates로 양쪽 생성', async () => {
     const mockTodoCreateMany = jest.fn().mockResolvedValue({ count: 0 })
     const mockTimelineCreateMany = jest.fn().mockResolvedValue({ count: 0 })
