@@ -37,6 +37,7 @@ interface Todo {
   priority: string
   urgent: boolean
   date: string | null
+  recurringRuleId?: string | null
 }
 
 interface DailyHighlight {
@@ -53,6 +54,7 @@ interface TimelineEntry {
   endTime: string | null
   title: string
   category: string | null
+  recurringRuleId?: string | null
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -119,6 +121,72 @@ function computeOverlapLayout(
   return result
 }
 
+
+// ── Recurring repeat picker ─────────────────────────────────────────────────
+type RecurringFreq = 'daily' | 'weekdays' | 'weekly' | 'monthly'
+
+const FREQ_LABELS: { val: RecurringFreq; label: string }[] = [
+  { val: 'daily', label: '매일' },
+  { val: 'weekdays', label: '평일' },
+  { val: 'weekly', label: '매주' },
+  { val: 'monthly', label: '매달' },
+]
+
+const DAY_BUTTONS = [
+  { iso: 1, label: '월' }, { iso: 2, label: '화' }, { iso: 3, label: '수' },
+  { iso: 4, label: '목' }, { iso: 5, label: '금' }, { iso: 6, label: '토' }, { iso: 7, label: '일' },
+]
+
+function RepeatPicker({
+  freq, weekDays, onFreqChange, onWeekDayToggle,
+}: {
+  freq: RecurringFreq
+  weekDays: number[]
+  onFreqChange: (f: RecurringFreq) => void
+  onWeekDayToggle: (iso: number) => void
+}) {
+  return (
+    <div className="flex flex-col gap-1 mt-1">
+      <div className="flex gap-1 flex-wrap">
+        {FREQ_LABELS.map(({ val, label }) => (
+          <button
+            key={val}
+            type="button"
+            onClick={e => { e.stopPropagation(); onFreqChange(val) }}
+            className="text-[10px] px-2 py-0.5 rounded"
+            style={{
+              background: freq === val ? 'var(--accent-dim)' : 'var(--bg-input)',
+              color: freq === val ? 'var(--accent-light)' : 'var(--text-dim)',
+              border: `1px solid ${freq === val ? 'var(--accent)' : 'var(--border)'}`,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {freq === 'weekly' && (
+        <div className="flex gap-1">
+          {DAY_BUTTONS.map(({ iso, label }) => (
+            <button
+              key={iso}
+              type="button"
+              onClick={e => { e.stopPropagation(); onWeekDayToggle(iso) }}
+              className="text-[10px] w-6 h-6 rounded"
+              style={{
+                background: weekDays.includes(iso) ? 'var(--accent-dim)' : 'var(--bg-input)',
+                color: weekDays.includes(iso) ? 'var(--accent-light)' : 'var(--text-dim)',
+                border: `1px solid ${weekDays.includes(iso) ? 'var(--accent)' : 'var(--border)'}`,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Entry block ────────────────────────────────────────────────────────────
 interface EntryBlockProps {
   entry: TimelineEntry
@@ -153,7 +221,10 @@ function EntryBlock({ entry, onDelete, onDragStart, layoutCol = 0, layoutTotal =
         <div className="font-mono text-[9px] opacity-55 tabular-nums leading-none">
           {entry.startTime}{entry.endTime ? ` – ${entry.endTime}` : ''}
         </div>
-        <div className="mt-0.5 leading-tight font-medium truncate">{entry.title}</div>
+        <div className="mt-0.5 leading-tight font-medium truncate">
+          {entry.recurringRuleId && <span style={{ fontSize: 8, opacity: 0.6, marginRight: 2 }}>🔁</span>}
+          {entry.title}
+        </div>
       </div>
       {/* delete */}
       <button
@@ -251,6 +322,14 @@ export default function WeeklyBoard() {
   const [newTodoTitle, setNewTodoTitle] = useState('')
   const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number } | null>(null)
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
+
+  // Repeat state
+  const [todoRepeat, setTodoRepeat] = useState(false)
+  const [todoFreq, setTodoFreq] = useState<RecurringFreq>('daily')
+  const [todoWeekDays, setTodoWeekDays] = useState<number[]>([])
+  const [entryRepeat, setEntryRepeat] = useState(false)
+  const [entryFreq, setEntryFreq] = useState<RecurringFreq>('daily')
+  const [entryWeekDays, setEntryWeekDays] = useState<number[]>([])
   const [onboardingDone, setOnboardingDone] = useState(true) // default true — localStorage로 덮어씀
 
   useEffect(() => {
@@ -599,12 +678,39 @@ export default function WeeklyBoard() {
   }
 
   const deleteTodo = async (id: string) => {
-    setTodos(prev => prev.filter(t => t.id !== id))
+    const target = todos.find(t => t.id === id)
+    if (target?.recurringRuleId) {
+      setTodos(prev => prev.filter(t => t.recurringRuleId !== target.recurringRuleId))
+    } else {
+      setTodos(prev => prev.filter(t => t.id !== id))
+    }
     await fetch(`/api/todos/${id}`, { method: 'DELETE' }).catch(() => fetchData())
   }
 
   const submitTodo = async (day: Date) => {
     if (!newTodoTitle.trim()) { setAddingTodoDay(null); return }
+
+    if (todoRepeat) {
+      const title = newTodoTitle.trim()
+      setNewTodoTitle('')
+      setAddingTodoDay(null)
+      setTodoRepeat(false)
+      const wd = todoFreq === 'weekly' && todoWeekDays.length === 0
+        ? [day.getDay() === 0 ? 7 : day.getDay()]
+        : todoWeekDays
+      await fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title, date: format(day, 'yyyy-MM-dd'), recurring: true, freq: todoFreq,
+          weekDays: todoFreq === 'weekly' ? wd : undefined,
+          monthDay: todoFreq === 'monthly' ? day.getDate() : undefined,
+        }),
+      })
+      fetchData()
+      return
+    }
+
     const tempId = `temp-${Date.now()}`
     const todo: Todo = { id: tempId, title: newTodoTitle.trim(), completed: false, priority: 'medium', urgent: false, date: day.toISOString() }
     setTodos(prev => [...prev, todo])
@@ -626,6 +732,31 @@ export default function WeeklyBoard() {
   const submitEntry = async (day: Date, hour: number) => {
     if (!newEntry.title.trim()) { setAddingEntry(null); return }
     const startTime = `${String(hour).padStart(2, '0')}:00`
+
+    if (entryRepeat) {
+      const title = newEntry.title.trim()
+      const endTime = newEntry.endTime || addOneHour(startTime)
+      const category = newEntry.category || undefined
+      setNewEntry({ title: '', endTime: '', category: '' })
+      setAddingEntry(null)
+      setEntryRepeat(false)
+      const wd = entryFreq === 'weekly' && entryWeekDays.length === 0
+        ? [day.getDay() === 0 ? 7 : day.getDay()]
+        : entryWeekDays
+      await fetch('/api/timeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: format(day, 'yyyy-MM-dd'), startTime, endTime, title, category,
+          recurring: true, freq: entryFreq,
+          weekDays: entryFreq === 'weekly' ? wd : undefined,
+          monthDay: entryFreq === 'monthly' ? day.getDate() : undefined,
+        }),
+      })
+      fetchData()
+      return
+    }
+
     const tempId = `temp-${Date.now()}`
     const entry: TimelineEntry = {
       id: tempId, date: day.toISOString(), startTime,
@@ -653,7 +784,12 @@ export default function WeeklyBoard() {
   }
 
   const deleteEntry = async (id: string) => {
-    setTimeline(prev => prev.filter(e => e.id !== id))
+    const target = timeline.find(e => e.id === id)
+    if (target?.recurringRuleId) {
+      setTimeline(prev => prev.filter(e => e.recurringRuleId !== target.recurringRuleId))
+    } else {
+      setTimeline(prev => prev.filter(e => e.id !== id))
+    }
     await fetch(`/api/timeline/${id}`, { method: 'DELETE' }).catch(() => fetchData())
   }
 
@@ -1061,45 +1197,67 @@ export default function WeeklyBoard() {
             boxShadow: '0 -4px 20px rgba(0,0,0,0.3)',
           }}
         >
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newTodoTitle}
-              onChange={e => setNewTodoTitle(e.target.value)}
-              onKeyDown={e => {
-                if (e.nativeEvent.isComposing) return
-                if (e.key === 'Enter') {
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newTodoTitle}
+                onChange={e => setNewTodoTitle(e.target.value)}
+                onKeyDown={e => {
+                  if (e.nativeEvent.isComposing) return
+                  if (e.key === 'Enter') {
+                    const day = weekDays.find(d => format(d, 'yyyy-MM-dd') === addingTodoDay)
+                    if (day) submitTodo(day)
+                  }
+                  if (e.key === 'Escape') { setAddingTodoDay(null); setNewTodoTitle(''); setTodoRepeat(false) }
+                }}
+                placeholder="할일 추가..."
+                className="flex-1 text-[14px] focus:outline-none rounded-xl px-3 py-2.5"
+                style={{
+                  background: 'var(--bg-input)',
+                  border: '1px solid var(--accent-dim)',
+                  color: 'var(--text)',
+                }}
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setTodoRepeat(r => !r)}
+                className="p-2 rounded-xl flex-shrink-0 text-xs"
+                style={{
+                  background: todoRepeat ? 'var(--accent-dim)' : 'var(--bg-card)',
+                  color: todoRepeat ? 'var(--accent-light)' : 'var(--text-dim)',
+                  border: `1px solid ${todoRepeat ? 'var(--accent)' : 'var(--border)'}`,
+                }}
+              >
+                반복
+              </button>
+              <button
+                onClick={() => {
                   const day = weekDays.find(d => format(d, 'yyyy-MM-dd') === addingTodoDay)
                   if (day) submitTodo(day)
-                }
-                if (e.key === 'Escape') { setAddingTodoDay(null); setNewTodoTitle('') }
-              }}
-              placeholder="할일 추가..."
-              className="flex-1 text-[14px] focus:outline-none rounded-xl px-3 py-2.5"
-              style={{
-                background: 'var(--bg-input)',
-                border: '1px solid var(--accent-dim)',
-                color: 'var(--text)',
-              }}
-              autoFocus
-            />
-            <button
-              onClick={() => {
-                const day = weekDays.find(d => format(d, 'yyyy-MM-dd') === addingTodoDay)
-                if (day) submitTodo(day)
-              }}
-              className="p-2.5 rounded-xl flex-shrink-0"
-              style={{ background: 'var(--accent-dim)', color: 'var(--accent-light)', border: '1px solid var(--accent)' }}
-            >
-              <Check size={16} />
-            </button>
-            <button
-              onClick={() => { setAddingTodoDay(null); setNewTodoTitle('') }}
-              className="p-2.5 rounded-xl flex-shrink-0"
-              style={{ background: 'var(--bg-card)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}
-            >
-              <X size={16} />
-            </button>
+                }}
+                className="p-2.5 rounded-xl flex-shrink-0"
+                style={{ background: 'var(--accent-dim)', color: 'var(--accent-light)', border: '1px solid var(--accent)' }}
+              >
+                <Check size={16} />
+              </button>
+              <button
+                onClick={() => { setAddingTodoDay(null); setNewTodoTitle(''); setTodoRepeat(false) }}
+                className="p-2.5 rounded-xl flex-shrink-0"
+                style={{ background: 'var(--bg-card)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            {todoRepeat && (
+              <RepeatPicker
+                freq={todoFreq}
+                weekDays={todoWeekDays}
+                onFreqChange={setTodoFreq}
+                onWeekDayToggle={iso => setTodoWeekDays(prev => prev.includes(iso) ? prev.filter(d => d !== iso) : [...prev, iso])}
+              />
+            )}
           </div>
         </div>
       )}
@@ -1341,6 +1499,10 @@ export default function WeeklyBoard() {
                         >
                           {todo.title}
                         </span>
+                        {/* 반복 인디케이터 */}
+                        {todo.recurringRuleId && (
+                          <span title="반복 할일" style={{ color: 'var(--text-dim)', flexShrink: 0, fontSize: 10 }}>🔁</span>
+                        )}
                         {/* 긴급 버튼 */}
                         <button
                           onClick={() => toggleUrgent(todo.id, todo.urgent)}
@@ -1380,42 +1542,64 @@ export default function WeeklyBoard() {
                       </div>
                     ))}
                     {isAdding && !isMobile ? (
-                      <div className="flex items-center gap-1.5 px-1">
-                        <input
-                          type="text"
-                          value={newTodoTitle}
-                          onChange={e => setNewTodoTitle(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') submitTodo(day)
-                            if (e.key === 'Escape') { setAddingTodoDay(null); setNewTodoTitle('') }
-                          }}
-                          placeholder="할일..."
-                          className="flex-1 min-w-0 text-[12px] focus:outline-none rounded px-2 py-1"
-                          style={{
-                            background: 'var(--bg-input)',
-                            border: '1px solid var(--accent-dim)',
-                            color: 'var(--text)',
-                          }}
-                          autoFocus
-                        />
-                        <button
-                          onClick={() => submitTodo(day)}
-                          className="p-1 rounded transition-all"
-                          style={{ color: 'var(--accent)', cursor: 'pointer' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-dim)' }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-                        >
-                          <Check size={13} />
-                        </button>
-                        <button
-                          onClick={() => { setAddingTodoDay(null); setNewTodoTitle('') }}
-                          className="p-1 rounded transition-all"
-                          style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--text)' }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)' }}
-                        >
-                          <X size={13} />
-                        </button>
+                      <div className="flex flex-col gap-1 px-1">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={newTodoTitle}
+                            onChange={e => setNewTodoTitle(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') submitTodo(day)
+                              if (e.key === 'Escape') { setAddingTodoDay(null); setNewTodoTitle(''); setTodoRepeat(false) }
+                            }}
+                            placeholder="할일..."
+                            className="flex-1 min-w-0 text-[12px] focus:outline-none rounded px-2 py-1"
+                            style={{
+                              background: 'var(--bg-input)',
+                              border: '1px solid var(--accent-dim)',
+                              color: 'var(--text)',
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setTodoRepeat(r => !r)}
+                            className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
+                            style={{
+                              background: todoRepeat ? 'var(--accent-dim)' : 'transparent',
+                              color: todoRepeat ? 'var(--accent-light)' : 'var(--text-dim)',
+                              border: `1px solid ${todoRepeat ? 'var(--accent)' : 'var(--border)'}`,
+                            }}
+                          >
+                            반복
+                          </button>
+                          <button
+                            onClick={() => submitTodo(day)}
+                            className="p-1 rounded transition-all"
+                            style={{ color: 'var(--accent)', cursor: 'pointer' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-dim)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                          >
+                            <Check size={13} />
+                          </button>
+                          <button
+                            onClick={() => { setAddingTodoDay(null); setNewTodoTitle(''); setTodoRepeat(false) }}
+                            className="p-1 rounded transition-all"
+                            style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.color = 'var(--text)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-dim)' }}
+                          >
+                            <X size={13} />
+                          </button>
+                        </div>
+                        {todoRepeat && (
+                          <RepeatPicker
+                            freq={todoFreq}
+                            weekDays={todoWeekDays}
+                            onFreqChange={setTodoFreq}
+                            onWeekDayToggle={iso => setTodoWeekDays(prev => prev.includes(iso) ? prev.filter(d => d !== iso) : [...prev, iso])}
+                          />
+                        )}
                       </div>
                     ) : isAdding && isMobile ? (
                       <div
@@ -1585,13 +1769,35 @@ export default function WeeklyBoard() {
                         <option value="exercise">운동</option>
                         <option value="study">학습</option>
                       </select>
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setEntryRepeat(r => !r) }}
+                        className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
+                        style={{
+                          background: entryRepeat ? 'var(--accent-dim)' : 'transparent',
+                          color: entryRepeat ? 'var(--accent-light)' : 'var(--text-dim)',
+                          border: `1px solid ${entryRepeat ? 'var(--accent)' : 'var(--border)'}`,
+                        }}
+                      >
+                        반복
+                      </button>
                       <button onClick={() => submitEntry(day, addingEntry!.hour)} style={{ color: 'var(--accent)' }}>
                         <Check size={12} />
                       </button>
-                      <button onClick={() => setAddingEntry(null)} style={{ color: 'var(--text-dim)' }}>
+                      <button onClick={() => { setAddingEntry(null); setEntryRepeat(false) }} style={{ color: 'var(--text-dim)' }}>
                         <X size={12} />
                       </button>
                     </div>
+                    {entryRepeat && (
+                      <div className="px-1 pb-1">
+                        <RepeatPicker
+                          freq={entryFreq}
+                          weekDays={entryWeekDays}
+                          onFreqChange={setEntryFreq}
+                          onWeekDayToggle={iso => setEntryWeekDays(prev => prev.includes(iso) ? prev.filter(d => d !== iso) : [...prev, iso])}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

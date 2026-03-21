@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { startOfDay, endOfDay, addDays } from 'date-fns'
+import { generateDates, createRecurringTimelineEntries, RECURRING_WINDOW_DAYS, type RecurringFreq } from '@/lib/recurring'
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,10 +55,37 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { date, startTime, endTime, title, description, category } = body
+    const { date, startTime, endTime, title, description, category,
+            recurring, freq, weekDays, monthDay } = body
 
-    if (!date || !startTime || !title) {
-      return NextResponse.json({ error: '날짜, 시작 시간, 제목은 필수입니다.' }, { status: 400 })
+    if (!startTime || !title) {
+      return NextResponse.json({ error: '시작 시간, 제목은 필수입니다.' }, { status: 400 })
+    }
+
+    if (recurring && freq) {
+      const rule = await prisma.recurringRule.create({
+        data: {
+          userId: session.user.id,
+          type: 'timeline',
+          freq: freq as RecurringFreq,
+          weekDays: weekDays?.length ? JSON.stringify(weekDays) : null,
+          monthDay: monthDay ?? null,
+          title,
+          startTime,
+          endTime: endTime ?? null,
+          category: category ?? null,
+        },
+      })
+      const start = date ? new Date(date) : new Date()
+      const end = addDays(start, RECURRING_WINDOW_DAYS)
+      const parsedWeekDays: number[] = weekDays ?? []
+      const dates = generateDates(freq as RecurringFreq, parsedWeekDays, monthDay, start, end)
+      await createRecurringTimelineEntries(prisma, rule.id, dates, { title, startTime, endTime, category }, session.user.id)
+      return NextResponse.json({ recurringRuleId: rule.id, count: dates.length }, { status: 201 })
+    }
+
+    if (!date) {
+      return NextResponse.json({ error: '날짜는 필수입니다.' }, { status: 400 })
     }
 
     const entry = await prisma.timelineEntry.create({

@@ -51,10 +51,17 @@ export async function DELETE(
 
     const { id } = await params
 
-    await prisma.todo.delete({
+    const todo = await prisma.todo.findUnique({
       where: { id, userId: session.user.id },
+      select: { recurringRuleId: true },
     })
 
+    if (todo?.recurringRuleId) {
+      await prisma.recurringRule.delete({ where: { id: todo.recurringRuleId } })
+      return NextResponse.json({ success: true, deletedSeries: true })
+    }
+
+    await prisma.todo.delete({ where: { id, userId: session.user.id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Failed to delete todo:', error)

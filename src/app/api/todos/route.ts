@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { startOfDay, endOfDay, addDays } from 'date-fns'
+import { generateDates, createRecurringTodos, RECURRING_WINDOW_DAYS, type RecurringFreq } from '@/lib/recurring'
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,10 +60,30 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { title, description, priority, date, projectId, sectionId } = body
+    const { title, description, priority, date, projectId, sectionId,
+            recurring, freq, weekDays, monthDay } = body
 
     if (!title) {
       return NextResponse.json({ error: '제목은 필수입니다.' }, { status: 400 })
+    }
+
+    if (recurring && freq) {
+      const rule = await prisma.recurringRule.create({
+        data: {
+          userId: session.user.id,
+          type: 'todo',
+          freq: freq as RecurringFreq,
+          weekDays: weekDays?.length ? JSON.stringify(weekDays) : null,
+          monthDay: monthDay ?? null,
+          title,
+        },
+      })
+      const start = date ? new Date(date) : new Date()
+      const end = addDays(start, RECURRING_WINDOW_DAYS)
+      const parsedWeekDays: number[] = weekDays ?? []
+      const dates = generateDates(freq as RecurringFreq, parsedWeekDays, monthDay, start, end)
+      await createRecurringTodos(prisma, rule.id, dates, title, session.user.id)
+      return NextResponse.json({ recurringRuleId: rule.id, count: dates.length }, { status: 201 })
     }
 
     const todo = await prisma.todo.create({

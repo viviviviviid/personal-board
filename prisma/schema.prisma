@@ -22,6 +22,7 @@ model User {
   habits        Habit[]
   projects      Project[]
   highlights    DailyHighlight[]
+  recurringRules RecurringRule[]
 }
 
 model Account {
@@ -75,34 +76,55 @@ model ProjectSection {
 }
 
 model Todo {
-  id          String        @id @default(cuid())
-  title       String
-  description String?       @db.Text
-  completed   Boolean       @default(false)
-  priority    String        @default("medium")
-  urgent      Boolean       @default(false)
-  date        DateTime?
-  projectId   String?
-  project     Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  sectionId   String?
-  section     ProjectSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  userId      String?
-  user        User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  title           String
+  description     String?       @db.Text
+  completed       Boolean       @default(false)
+  priority        String        @default("medium")
+  urgent          Boolean       @default(false)
+  date            DateTime?
+  projectId       String?
+  project         Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  sectionId       String?
+  section         ProjectSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+  userId          String?
+  user            User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  recurringRuleId String?
+  recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 model TimelineEntry {
-  id          String   @id @default(cuid())
-  date        DateTime @db.Date
-  startTime   String
-  endTime     String?
+  id              String   @id @default(cuid())
+  date            DateTime @db.Date
+  startTime       String
+  endTime         String?
+  title           String
+  description     String?  @db.Text
+  category        String?
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  recurringRuleId String?
+  recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: Cascade)
+  createdAt       DateTime @default(now())
+}
+
+model RecurringRule {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String
+  freq        String
+  weekDays    String?
+  monthDay    Int?
   title       String
-  description String?  @db.Text
+  startTime   String?
+  endTime     String?
   category    String?
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
+  todos       Todo[]
+  timelineEntries TimelineEntry[]
 }
 
 model Habit {

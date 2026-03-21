@@ -43,10 +43,17 @@ export async function DELETE(
 
     const { id } = await params
 
-    await prisma.timelineEntry.delete({
+    const entry = await prisma.timelineEntry.findUnique({
       where: { id, userId: session.user.id },
+      select: { recurringRuleId: true },
     })
 
+    if (entry?.recurringRuleId) {
+      await prisma.recurringRule.delete({ where: { id: entry.recurringRuleId } })
+      return NextResponse.json({ success: true, deletedSeries: true })
+    }
+
+    await prisma.timelineEntry.delete({ where: { id, userId: session.user.id } })
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Failed to delete timeline entry:', error)
