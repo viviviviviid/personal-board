@@ -1807,119 +1807,46 @@ export default function WeeklyBoard() {
                   </div>
                 )}
 
-                {/* Inline add form */}
+                {/* Draft entry block + floating tooltip */}
                 {isAddingHere && (() => {
                   const formStartTime = addingEntry!.startTime ?? `${String(addingEntry!.hour).padStart(2, '0')}:00`
                   const formTopY = Math.max(0, timeToY(formStartTime))
                   const formEndTime = newEntry.endTime || addOneHour(formStartTime)
-                  const formHeight = Math.max(64, timeToY(formEndTime) - formTopY)
-                  return (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: formTopY,
-                      height: formHeight,
-                      left: 3, right: 3, zIndex: 30,
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--accent-dim)',
-                      borderRadius: 10,
-                    }}
-                    className="p-2"
-                    onClick={e => e.stopPropagation()}
-                    onMouseDown={e => e.stopPropagation()}
-                  >
-                    <input
-                      type="text"
-                      value={newEntry.title}
-                      onChange={e => setNewEntry(p => ({ ...p, title: e.target.value }))}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') submitEntry(day, addingEntry!.hour, addingEntry!.startTime)
-                        if (e.key === 'Escape') setAddingEntry(null)
-                      }}
-                      placeholder={`${addingEntry!.startTime ?? `${String(addingEntry!.hour).padStart(2, '0')}:00`} 내용...`}
-                      className="w-full bg-transparent border-none text-[11px] focus:outline-none mb-1.5"
-                      style={{ color: 'var(--text)' }}
-                      autoFocus
-                    />
-                    <div className="flex gap-1">
-                      <input
-                        type="text"
-                        value={newEntry.endTime}
-                        onChange={e => setNewEntry(p => ({ ...p, endTime: e.target.value }))}
-                        placeholder="~종료"
-                        className="w-14 text-[10px] rounded px-1.5 py-0.5 focus:outline-none"
-                        style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-                      />
-                      <select
-                        value={newEntry.category}
-                        onChange={e => setNewEntry(p => ({ ...p, category: e.target.value }))}
-                        className="flex-1 text-[10px] rounded px-1 py-0.5 focus:outline-none"
-                        style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-                      >
-                        <option value="">카테고리</option>
-                        <option value="work">업무</option>
-                        <option value="personal">개인</option>
-                        <option value="exercise">운동</option>
-                        <option value="study">학습</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={e => { e.stopPropagation(); setEntryRepeat(r => !r) }}
-                        className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
-                        style={{
-                          background: entryRepeat ? 'var(--accent-dim)' : 'transparent',
-                          color: entryRepeat ? 'var(--accent-light)' : 'var(--text-dim)',
-                          border: `1px solid ${entryRepeat ? 'var(--accent)' : 'var(--border)'}`,
-                        }}
-                      >
-                        반복
-                      </button>
-                      <button
-                        type="button"
-                        onClick={e => { e.stopPropagation(); setEntryCreateTodo(r => !r) }}
-                        className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
-                        style={{
-                          background: entryCreateTodo ? 'var(--accent-dim)' : 'transparent',
-                          color: entryCreateTodo ? 'var(--accent-light)' : 'var(--text-dim)',
-                          border: `1px solid ${entryCreateTodo ? 'var(--accent)' : 'var(--border)'}`,
-                        }}
-                      >
-                        TODO
-                      </button>
-                      <button onClick={() => submitEntry(day, addingEntry!.hour, addingEntry!.startTime)} style={{ color: 'var(--accent)' }}>
-                        <Check size={12} />
-                      </button>
-                      <button onClick={() => { setAddingEntry(null); setEntryRepeat(false); setEntryCreateTodo(false) }} style={{ color: 'var(--text-dim)' }}>
-                        <X size={12} />
-                      </button>
-                    </div>
-                    {entryRepeat && (
-                      <div className="px-1 pb-1">
-                        <RepeatPicker
-                          freq={entryFreq}
-                          weekDays={entryWeekDays}
-                          onFreqChange={setEntryFreq}
-                          onWeekDayToggle={iso => setEntryWeekDays(prev => prev.includes(iso) ? prev.filter(d => d !== iso) : [...prev, iso])}
-                        />
-                      </div>
-                    )}
-                    {/* form resize handle */}
-                    <div
-                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 10, cursor: 'ns-resize', zIndex: 31 }}
-                      className="flex items-center justify-center"
-                      onMouseDown={e => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        const formStartTime = addingEntry!.startTime ?? `${String(addingEntry!.hour).padStart(2, '0')}:00`
-                        const formTopY = timeToY(formStartTime)
-                        const currentEndTime = newEntry.endTime || addOneHour(formStartTime)
-                        const startEndY = timeToY(currentEndTime)
-                        const startMouseY = e.clientY
+                  const formHeight = Math.max(ROW_H / 2, timeToY(formEndTime) - formTopY)
 
+                  // tooltip position (fixed) — read column rect at render time
+                  const colRect = columnRefs.current[di]?.getBoundingClientRect()
+                  const tipTop = colRect ? colRect.top + formTopY : formTopY
+                  const flipLeft = di >= 5 // 오른쪽 끝 컬럼은 왼쪽에 표시
+                  const tipLeft = colRect
+                    ? flipLeft ? colRect.left - 192 : colRect.right + 4
+                    : 0
+
+                  return (
+                  <>
+                    {/* 드래프트 블록 — 이동 + 리사이즈 */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: formTopY, height: formHeight,
+                        left: 3, right: 3, zIndex: 30,
+                        background: 'var(--accent-dim)',
+                        border: '1px solid var(--accent)',
+                        borderRadius: 6,
+                        cursor: 'grab',
+                      }}
+                      className="select-none group"
+                      onMouseDown={e => {
+                        e.stopPropagation()
+                        e.preventDefault()
+                        const duration = timeToY(formEndTime) - timeToY(formStartTime)
+                        const startMouseY = e.clientY
+                        const startTopY = formTopY
                         const onMove = (ev: MouseEvent) => {
                           const delta = ev.clientY - startMouseY
-                          const newEndY = Math.max(formTopY + ROW_H / 4, startEndY + delta)
-                          setNewEntry(p => ({ ...p, endTime: yToTime(newEndY) }))
+                          const newTopY = Math.max(0, startTopY + delta)
+                          setAddingEntry(prev => prev ? { ...prev, startTime: yToTime(newTopY) } : prev)
+                          setNewEntry(prev => ({ ...prev, endTime: yToTime(newTopY + duration) }))
                         }
                         const onUp = () => {
                           document.removeEventListener('mousemove', onMove)
@@ -1927,15 +1854,139 @@ export default function WeeklyBoard() {
                           document.body.style.cursor = ''
                           document.body.style.userSelect = ''
                         }
-                        document.body.style.cursor = 'ns-resize'
+                        document.body.style.cursor = 'grabbing'
                         document.body.style.userSelect = 'none'
                         document.addEventListener('mousemove', onMove)
                         document.addEventListener('mouseup', onUp)
                       }}
                     >
-                      <div className="w-8 h-[2px] rounded-full opacity-40" style={{ background: 'var(--accent)' }} />
+                      <div className="px-1.5 pt-1 pointer-events-none">
+                        <div className="font-mono text-[9px] opacity-70" style={{ color: 'var(--accent-light)' }}>
+                          {formStartTime} – {formEndTime}
+                        </div>
+                        {newEntry.title && (
+                          <div className="text-[10px] font-medium truncate mt-0.5" style={{ color: 'var(--accent-light)' }}>
+                            {newEntry.title}
+                          </div>
+                        )}
+                      </div>
+                      {/* 리사이즈 핸들 */}
+                      <div
+                        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 10, cursor: 'ns-resize', zIndex: 31 }}
+                        className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        onMouseDown={e => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          const startEndY = timeToY(formEndTime)
+                          const minY = timeToY(formStartTime) + ROW_H / 4
+                          const startMouseY = e.clientY
+                          const onMove = (ev: MouseEvent) => {
+                            const newEndY = Math.max(minY, startEndY + (ev.clientY - startMouseY))
+                            setNewEntry(p => ({ ...p, endTime: yToTime(newEndY) }))
+                          }
+                          const onUp = () => {
+                            document.removeEventListener('mousemove', onMove)
+                            document.removeEventListener('mouseup', onUp)
+                            document.body.style.cursor = ''
+                            document.body.style.userSelect = ''
+                          }
+                          document.body.style.cursor = 'ns-resize'
+                          document.body.style.userSelect = 'none'
+                          document.addEventListener('mousemove', onMove)
+                          document.addEventListener('mouseup', onUp)
+                        }}
+                      >
+                        <div className="w-8 h-[2px] rounded-full" style={{ background: 'var(--accent)' }} />
+                      </div>
                     </div>
-                  </div>
+
+                    {/* 플로팅 툴팁 — fixed 포지셔닝 */}
+                    <div
+                      style={{
+                        position: 'fixed',
+                        top: tipTop,
+                        left: tipLeft,
+                        width: 188,
+                        zIndex: 9999,
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 10,
+                        boxShadow: '0 6px 24px rgba(0,0,0,0.35)',
+                      }}
+                      className="p-2"
+                      onMouseDown={e => e.stopPropagation()}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        value={newEntry.title}
+                        onChange={e => setNewEntry(p => ({ ...p, title: e.target.value }))}
+                        onKeyDown={e => {
+                          if (e.nativeEvent.isComposing) return
+                          if (e.key === 'Enter') submitEntry(day, addingEntry!.hour, addingEntry!.startTime)
+                          if (e.key === 'Escape') { setAddingEntry(null); setEntryRepeat(false); setEntryCreateTodo(false) }
+                        }}
+                        placeholder="내용..."
+                        className="w-full bg-transparent border-none text-[11px] focus:outline-none mb-1.5"
+                        style={{ color: 'var(--text)' }}
+                        autoFocus
+                      />
+                      <div className="flex gap-1 flex-wrap">
+                        <select
+                          value={newEntry.category}
+                          onChange={e => setNewEntry(p => ({ ...p, category: e.target.value }))}
+                          className="flex-1 text-[10px] rounded px-1 py-0.5 focus:outline-none"
+                          style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)', minWidth: 60 }}
+                        >
+                          <option value="">카테고리</option>
+                          <option value="work">업무</option>
+                          <option value="personal">개인</option>
+                          <option value="exercise">운동</option>
+                          <option value="study">학습</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); setEntryRepeat(r => !r) }}
+                          className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{
+                            background: entryRepeat ? 'var(--accent-dim)' : 'transparent',
+                            color: entryRepeat ? 'var(--accent-light)' : 'var(--text-dim)',
+                            border: `1px solid ${entryRepeat ? 'var(--accent)' : 'var(--border)'}`,
+                          }}
+                        >
+                          반복
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); setEntryCreateTodo(r => !r) }}
+                          className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{
+                            background: entryCreateTodo ? 'var(--accent-dim)' : 'transparent',
+                            color: entryCreateTodo ? 'var(--accent-light)' : 'var(--text-dim)',
+                            border: `1px solid ${entryCreateTodo ? 'var(--accent)' : 'var(--border)'}`,
+                          }}
+                        >
+                          TODO
+                        </button>
+                        <button onClick={() => submitEntry(day, addingEntry!.hour, addingEntry!.startTime)} style={{ color: 'var(--accent)' }}>
+                          <Check size={12} />
+                        </button>
+                        <button onClick={() => { setAddingEntry(null); setEntryRepeat(false); setEntryCreateTodo(false) }} style={{ color: 'var(--text-dim)' }}>
+                          <X size={12} />
+                        </button>
+                      </div>
+                      {entryRepeat && (
+                        <div className="pt-1">
+                          <RepeatPicker
+                            freq={entryFreq}
+                            weekDays={entryWeekDays}
+                            onFreqChange={setEntryFreq}
+                            onWeekDayToggle={iso => setEntryWeekDays(prev => prev.includes(iso) ? prev.filter(d => d !== iso) : [...prev, iso])}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </>
                   )
                 })()}
               </div>
