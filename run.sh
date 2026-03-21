@@ -3,6 +3,12 @@
 APP="personal-board"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# .env에서 PORT 읽기
+if [ -f "$DIR/.env" ]; then
+  export $(grep -E '^PORT=' "$DIR/.env" | xargs)
+fi
+PORT="${PORT:-38471}"
+
 cmd_start() {
   cd "$DIR"
 
@@ -23,7 +29,9 @@ cmd_start() {
 
   pm2 describe "$APP" &>/dev/null \
     && pm2 restart "$APP" \
-    || pm2 start "npm start" --name "$APP"
+    || pm2 start "npx next start -p $PORT" --name "$APP"
+
+  echo "Running on http://localhost:$PORT"
 
   pm2 save
   echo "Started. Logs: ./run.sh logs"
@@ -72,5 +80,7 @@ case "$1" in
     echo "  logs    - tail logs"
     echo "  status  - show process status"
     echo "  update  - git pull, rebuild, restart"
+    echo ""
+    echo "  PORT=1234 ./run.sh start   (default: 38471)"
     ;;
 esac
