@@ -28,6 +28,10 @@ export async function GET() {
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}))
       console.error('Google Calendar list error:', res.status, errBody)
+      // 403 = scope 부족 → 캘린더 미연결과 동일하게 처리
+      if (res.status === 403 || res.status === 401) {
+        return NextResponse.json({ calendars: [], status: 'no_token' })
+      }
       return NextResponse.json({ calendars: [], status: 'api_error', code: res.status })
     }
 

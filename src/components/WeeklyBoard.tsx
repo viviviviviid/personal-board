@@ -261,6 +261,27 @@ export default function WeeklyBoard() {
     setOnboardingDone(true)
   }
 
+  // 캘린더 연결 유도 배너 (최초 1회)
+  const [calPromptDismissed, setCalPromptDismissed] = useState(true)
+
+  useEffect(() => {
+    if (!localStorage.getItem('pb-cal-prompted')) setCalPromptDismissed(false)
+  }, [])
+
+  const dismissCalPrompt = () => {
+    localStorage.setItem('pb-cal-prompted', '1')
+    setCalPromptDismissed(true)
+  }
+
+  const connectCalendar = () => {
+    dismissCalPrompt()
+    signIn('google', { callbackUrl: '/' }, {
+      scope: 'openid email profile https://www.googleapis.com/auth/calendar.readonly',
+      access_type: 'offline',
+      prompt: 'consent',
+    } as Record<string, string>)
+  }
+
   // Google Calendar 목록 fetch
   const fetchCalendarList = useCallback(async () => {
     setCalStatus('loading')
@@ -739,7 +760,7 @@ export default function WeeklyBoard() {
             <div style={{ position: 'relative' }} data-cal-panel>
               {(calStatus === 'no_token' || calStatus === 'error') && (
                 <button
-                  onClick={() => signIn('google', { callbackUrl: '/' })}
+                  onClick={() => signIn('google', { callbackUrl: '/' }, { scope: 'openid email profile https://www.googleapis.com/auth/calendar.readonly', access_type: 'offline', prompt: 'consent' })}
                   className="p-1.5 rounded-lg transition-all flex items-center gap-1.5 text-[11px]"
                   style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-dim)' }}
                   title="Google Calendar 연결"
@@ -1040,6 +1061,37 @@ export default function WeeklyBoard() {
               style={{ background: 'var(--bg-card)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}
             >
               <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Google Calendar 연결 유도 배너 (최초 1회) ───────────────────── */}
+      {view === 'weekly' && !loading && !calPromptDismissed && calStatus === 'no_token' && (
+        <div
+          className="flex-shrink-0 rounded-xl p-3 mb-3 flex items-center gap-3"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+        >
+          <CalendarDays size={18} style={{ color: 'var(--accent-light)', flexShrink: 0 }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>Google 캘린더 일정을 함께 볼까요?</p>
+            <p className="text-[11px]" style={{ color: 'var(--text-dim)' }}>주간 보드에 내 캘린더 일정을 오버레이할 수 있어요.</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={connectCalendar}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent)', color: 'var(--accent-light)' }}
+            >
+              연결하기
+            </button>
+            <button
+              onClick={dismissCalPrompt}
+              className="p-1.5 rounded-lg transition-all"
+              style={{ color: 'var(--text-dim)' }}
+              title="닫기"
+            >
+              <X size={14} />
             </button>
           </div>
         </div>

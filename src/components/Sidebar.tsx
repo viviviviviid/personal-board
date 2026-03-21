@@ -2,10 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, FolderKanban, Flame, ChevronLeft, ChevronRight, LogOut } from 'lucide-react'
+import { CalendarDays, FolderKanban, Flame, ChevronLeft, ChevronRight, LogOut, Settings } from 'lucide-react'
 import { useSidebar } from '@/context/SidebarContext'
 import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
+import { useState } from 'react'
+import SettingsModal from './SettingsModal'
 
 const navItems = [
   { href: '/', label: '보드', sub: '할일 + 타임라인', icon: CalendarDays },
@@ -17,8 +19,11 @@ export default function Sidebar() {
   const pathname = usePathname()
   const { isCollapsed, toggle } = useSidebar()
   const { data: session } = useSession()
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
+    <>
+    <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     <aside
       className="hidden md:flex fixed left-0 top-0 h-full flex-col z-50 transition-all duration-200"
       style={{
@@ -108,6 +113,33 @@ export default function Sidebar() {
 
       {/* User + Footer */}
       <div className="px-3 py-4 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border-dim)' }}>
+        {/* 설정 버튼 */}
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="flex items-center rounded-xl p-2 w-full transition-all"
+          style={{
+            gap: isCollapsed ? 0 : 8,
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            background: 'transparent',
+            border: '1px solid transparent',
+            color: 'var(--text-dim)',
+          }}
+          title="설정"
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'var(--bg-hover)'
+            e.currentTarget.style.borderColor = 'var(--border-dim)'
+            e.currentTarget.style.color = 'var(--text)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.borderColor = 'transparent'
+            e.currentTarget.style.color = 'var(--text-dim)'
+          }}
+        >
+          <Settings size={15} className="flex-shrink-0" />
+          {!isCollapsed && <span className="text-[12px] font-medium">설정</span>}
+        </button>
+
         {/* User info */}
         {session?.user && (
           <div
@@ -160,5 +192,6 @@ export default function Sidebar() {
 
       </div>
     </aside>
+    </>
   )
 }
