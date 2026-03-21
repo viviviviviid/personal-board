@@ -715,7 +715,8 @@ export default function WeeklyBoard() {
     : `${format(currentMonth, 'yyyy.MM')} — ${format(addMonths(currentMonth, monthCount - 1), 'yyyy.MM')}`
   const nowY = nowToY(now)
   const gridCols = `44px repeat(7, minmax(0, 1fr))`
-  const visibleDays = isMobile ? [weekDays[mobileDay]] : weekDays
+  const visibleDays = isMobile ? weekDays.slice(mobileDay, Math.min(mobileDay + 3, 7)) : weekDays
+  const mobileCols = `44px repeat(${visibleDays.length}, minmax(0, 1fr))`
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -958,6 +959,13 @@ export default function WeeklyBoard() {
             monthCount={monthCount}
             enabledCalendars={monthlyEnabledCals}
             calendarList={calendarList}
+            onDateSelect={(date) => {
+              const day = date.getDay()
+              const dayIndex = day === 0 ? 6 : day - 1
+              setCurrentWeekStart(startOfWeek(date, { weekStartsOn: 1 }))
+              if (isMobile) setMobileDay(dayIndex)
+              setView('weekly')
+            }}
           />
         </div>
       )}
@@ -967,7 +975,7 @@ export default function WeeklyBoard() {
         <div className="flex gap-1 mb-3 overflow-x-auto flex-shrink-0">
           {weekDays.map((day, i) => {
             const today = isToday(day)
-            const isSelected = mobileDay === i
+            const isSelected = i >= mobileDay && i < mobileDay + 3
             return (
               <button
                 key={i}
@@ -1143,7 +1151,7 @@ export default function WeeklyBoard() {
       >
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? '44px 1fr' : gridCols,
+          gridTemplateColumns: isMobile ? mobileCols : gridCols,
           minWidth: isMobile ? 0 : '760px',
         }}>
 

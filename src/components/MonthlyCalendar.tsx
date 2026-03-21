@@ -45,10 +45,11 @@ interface Props {
   monthCount: 1 | 2 | 3
   enabledCalendars?: Set<string>
   calendarList?: CalendarItem[]
+  onDateSelect?: (date: Date) => void
 }
 
 // ── Main component ─────────────────────────────────────────────────────────
-export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalendars, calendarList }: Props) {
+export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalendars, calendarList, onDateSelect }: Props) {
   const [todos, setTodos] = useState<Todo[]>([])
   const [calEvents, setCalEvents] = useState<CalEvent[]>([])
   const [loading, setLoading] = useState(true)
@@ -150,6 +151,7 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
           calEventsForDay={calEventsForDay}
           loading={loading}
           onRefresh={fetchTodos}
+          onDateSelect={onDateSelect}
         />
       ))}
     </div>
@@ -164,6 +166,7 @@ function MonthGrid({
   calEventsForDay,
   loading,
   onRefresh,
+  onDateSelect,
 }: {
   month: Date
   cellSize: number
@@ -171,6 +174,7 @@ function MonthGrid({
   calEventsForDay: (day: Date) => CalEvent[]
   loading: boolean
   onRefresh: () => void
+  onDateSelect?: (date: Date) => void
 }) {
   const monthStart = startOfMonth(month)
   const monthEnd = endOfMonth(month)
@@ -283,7 +287,7 @@ function MonthGrid({
           return (
             <div
               key={i}
-              onClick={() => { if (inMonth && !isAdding) { setAddingDay(dayKey); setNewTitle('') } }}
+              onClick={() => { if (inMonth && !isAdding) { onDateSelect?.(day); setAddingDay(dayKey); setNewTitle('') } }}
               style={{
                 background: today ? 'rgba(139, 92, 246, 0.06)' : inMonth ? 'var(--bg-card)' : 'var(--bg-surface)',
                 borderRight: (i + 1) % 7 !== 0 ? '1px solid var(--border)' : 'none',
