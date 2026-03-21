@@ -55,7 +55,7 @@ export async function createRecurringTimelineEntries(
   prisma: PrismaClient,
   ruleId: string,
   dates: Date[],
-  rule: { title: string; startTime: string; endTime?: string | null; category?: string | null },
+  rule: { title: string; startTime: string; endTime?: string | null; category?: string | null; hideFromMonthly?: boolean },
   userId: string,
 ): Promise<void> {
   await prisma.timelineEntry.createMany({
@@ -66,6 +66,7 @@ export async function createRecurringTimelineEntries(
       title: rule.title,
       category: rule.category ?? null,
       recurringRuleId: ruleId,
+      hideFromMonthly: rule.hideFromMonthly ?? false,
       userId,
     })),
   })

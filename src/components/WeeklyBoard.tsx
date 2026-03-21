@@ -560,6 +560,7 @@ export default function WeeklyBoard() {
   const [entryFreq, setEntryFreq] = useState<RecurringFreq>('daily')
   const [entryWeekDays, setEntryWeekDays] = useState<number[]>([])
   const [entryCreateTodo, setEntryCreateTodo] = useState(false)
+  const [entryHideMonthly, setEntryHideMonthly] = useState(false)
   const [onboardingDone, setOnboardingDone] = useState(true) // default true — localStorage로 덮어씀
 
   useEffect(() => {
@@ -967,9 +968,13 @@ export default function WeeklyBoard() {
       const title = newEntry.title.trim()
       const endTime = newEntry.endTime || addOneHour(startTime)
       const category = newEntry.category || undefined
+      const shouldCreateTodo = entryCreateTodo
+      const hideFromMonthly = entryHideMonthly
       setNewEntry({ title: '', endTime: '', category: '' })
       setAddingEntry(null)
       setEntryRepeat(false)
+      setEntryCreateTodo(false)
+      setEntryHideMonthly(false)
       const wd = entryFreq === 'weekly' && entryWeekDays.length === 0
         ? [day.getDay() === 0 ? 7 : day.getDay()]
         : entryWeekDays
@@ -981,8 +986,21 @@ export default function WeeklyBoard() {
           recurring: true, freq: entryFreq,
           weekDays: entryFreq === 'weekly' ? wd : undefined,
           monthDay: entryFreq === 'monthly' ? day.getDate() : undefined,
+          hideFromMonthly,
         }),
       })
+      if (shouldCreateTodo) {
+        await fetch('/api/todos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title, date: format(day, 'yyyy-MM-dd'),
+            recurring: true, freq: entryFreq,
+            weekDays: entryFreq === 'weekly' ? wd : undefined,
+            monthDay: entryFreq === 'monthly' ? day.getDate() : undefined,
+          }),
+        })
+      }
       fetchData()
       return
     }
@@ -994,10 +1012,12 @@ export default function WeeklyBoard() {
       title: newEntry.title.trim(), category: newEntry.category || null,
     }
     const shouldCreateTodo = entryCreateTodo
+    const hideFromMonthly = entryHideMonthly
     setTimeline(prev => [...prev, entry])
     setNewEntry({ title: '', endTime: '', category: '' })
     setAddingEntry(null)
     setEntryCreateTodo(false)
+    setEntryHideMonthly(false)
     try {
       const res = await fetch('/api/timeline', {
         method: 'POST',
@@ -1006,6 +1026,7 @@ export default function WeeklyBoard() {
           date: format(day, 'yyyy-MM-dd'), startTime,
           endTime: entry.endTime, title: entry.title,
           category: entry.category || undefined,
+          hideFromMonthly,
         }),
       })
       const created = await res.json()
@@ -2179,7 +2200,7 @@ export default function WeeklyBoard() {
                         onKeyDown={e => {
                           if (e.nativeEvent.isComposing) return
                           if (e.key === 'Enter') submitEntry(day, addingEntry!.hour, addingEntry!.startTime)
-                          if (e.key === 'Escape') { setAddingEntry(null); setEntryRepeat(false); setEntryCreateTodo(false) }
+                          if (e.key === 'Escape') { setAddingEntry(null); setEntryRepeat(false); setEntryCreateTodo(false); setEntryHideMonthly(false) }
                         }}
                         placeholder="내용..."
                         className="w-full bg-transparent border-none text-[11px] focus:outline-none mb-1.5"
@@ -2223,10 +2244,22 @@ export default function WeeklyBoard() {
                         >
                           TODO
                         </button>
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); setEntryHideMonthly(r => !r) }}
+                          className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
+                          style={{
+                            background: entryHideMonthly ? 'var(--accent-dim)' : 'transparent',
+                            color: entryHideMonthly ? 'var(--accent-light)' : 'var(--text-dim)',
+                            border: `1px solid ${entryHideMonthly ? 'var(--accent)' : 'var(--border)'}`,
+                          }}
+                        >
+                          월숨김
+                        </button>
                         <button onClick={() => submitEntry(day, addingEntry!.hour, addingEntry!.startTime)} style={{ color: 'var(--accent)' }}>
                           <Check size={12} />
                         </button>
-                        <button onClick={() => { setAddingEntry(null); setEntryRepeat(false); setEntryCreateTodo(false) }} style={{ color: 'var(--text-dim)' }}>
+                        <button onClick={() => { setAddingEntry(null); setEntryRepeat(false); setEntryCreateTodo(false); setEntryHideMonthly(false) }} style={{ color: 'var(--text-dim)' }}>
                           <X size={12} />
                         </button>
                       </div>

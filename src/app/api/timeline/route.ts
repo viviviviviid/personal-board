@@ -12,6 +12,22 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const dateParam = searchParams.get('date')
     const weekParam = searchParams.get('week')
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
+
+    if (startDateParam && endDateParam) {
+      const entries = await prisma.timelineEntry.findMany({
+        where: {
+          userId: session.user.id,
+          date: {
+            gte: startOfDay(new Date(startDateParam)),
+            lte: endOfDay(new Date(endDateParam)),
+          },
+        },
+        orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+      })
+      return NextResponse.json(entries)
+    }
 
     if (weekParam) {
       const weekStart = new Date(weekParam)
@@ -56,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { date, startTime, endTime, title, description, category,
-            recurring, freq, weekDays, monthDay } = body
+            recurring, freq, weekDays, monthDay, hideFromMonthly } = body
 
     if (!startTime || !title) {
       return NextResponse.json({ error: '시작 시간, 제목은 필수입니다.' }, { status: 400 })
@@ -80,7 +96,7 @@ export async function POST(request: NextRequest) {
       const end = addDays(start, RECURRING_WINDOW_DAYS)
       const parsedWeekDays: number[] = weekDays ?? []
       const dates = generateDates(freq as RecurringFreq, parsedWeekDays, monthDay, start, end)
-      await createRecurringTimelineEntries(prisma, rule.id, dates, { title, startTime, endTime, category }, session.user.id)
+      await createRecurringTimelineEntries(prisma, rule.id, dates, { title, startTime, endTime, category, hideFromMonthly: !!hideFromMonthly }, session.user.id)
       return NextResponse.json({ recurringRuleId: rule.id, count: dates.length }, { status: 201 })
     }
 
@@ -96,6 +112,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         category,
+        hideFromMonthly: !!hideFromMonthly,
         userId: session.user.id,
       },
     })

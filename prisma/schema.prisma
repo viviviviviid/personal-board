@@ -105,9 +105,10 @@ model TimelineEntry {
   category        String?
   userId          String?
   user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  recurringRuleId String?
-  recurringRule   RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: Cascade)
-  createdAt       DateTime @default(now())
+  recurringRuleId  String?
+  recurringRule    RecurringRule? @relation(fields: [recurringRuleId], references: [id], onDelete: Cascade)
+  hideFromMonthly  Boolean  @default(false)
+  createdAt        DateTime @default(now())
 }
 
 model RecurringRule {

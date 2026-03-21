@@ -7,6 +7,16 @@ import {
 } from 'date-fns'
 
 // ── Types ──────────────────────────────────────────────────────────────────
+interface TimelineEntry {
+  id: string
+  title: string
+  date: string
+  startTime: string
+  endTime: string | null
+  category: string | null
+  hideFromMonthly: boolean
+}
+
 interface Todo {
   id: string
   title: string
@@ -37,6 +47,10 @@ const PRIORITY_COLOR: Record<string, string> = {
   medium: '#F59E0B',
   low: '#A1A1AA',
 }
+const CAT_COLOR: Record<string, string> = {
+  work: '#6366f1', personal: '#ec4899', exercise: '#10b981',
+  study: '#f59e0b', health: '#14b8a6', other: '#8b5cf6',
+}
 const HEADER_H = 58
 
 // ── Props ──────────────────────────────────────────────────────────────────
@@ -51,6 +65,7 @@ interface Props {
 // ── Main component ─────────────────────────────────────────────────────────
 export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalendars, calendarList, onDateSelect }: Props) {
   const [todos, setTodos] = useState<Todo[]>([])
+  const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [calEvents, setCalEvents] = useState<CalEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [cellSize, setCellSize] = useState(80)
@@ -90,8 +105,12 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
     try {
       const startDate = format(currentMonth, 'yyyy-MM-dd')
       const endDate = format(endOfMonth(addMonths(currentMonth, monthCount - 1)), 'yyyy-MM-dd')
-      const res = await fetch(`/api/todos?startDate=${startDate}&endDate=${endDate}`)
-      if (res.ok) setTodos(await res.json())
+      const [todosRes, timelineRes] = await Promise.all([
+        fetch(`/api/todos?startDate=${startDate}&endDate=${endDate}`),
+        fetch(`/api/timeline?startDate=${startDate}&endDate=${endDate}`),
+      ])
+      if (todosRes.ok) setTodos(await todosRes.json())
+      if (timelineRes.ok) setTimeline(await timelineRes.json())
     } catch {
       // ignore
     } finally {
@@ -127,6 +146,8 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
 
   const todosForDay = (day: Date) =>
     todos.filter(t => t.date && isSameDay(new Date(t.date), day))
+  const timelineForDay = (day: Date) =>
+    timeline.filter(e => !e.hideFromMonthly && isSameDay(new Date(e.date), day))
   const calEventsForDay = (day: Date) =>
     calEvents.filter(e => isSameDay(new Date(e.start.dateTime), day))
 
@@ -148,6 +169,7 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
           month={month}
           cellSize={cellSize}
           todosForDay={todosForDay}
+          timelineForDay={timelineForDay}
           calEventsForDay={calEventsForDay}
           loading={loading}
           onRefresh={fetchTodos}
@@ -163,6 +185,7 @@ function MonthGrid({
   month,
   cellSize,
   todosForDay,
+  timelineForDay,
   calEventsForDay,
   loading,
   onRefresh,
@@ -171,6 +194,7 @@ function MonthGrid({
   month: Date
   cellSize: number
   todosForDay: (day: Date) => Todo[]
+  timelineForDay: (day: Date) => TimelineEntry[]
   calEventsForDay: (day: Date) => CalEvent[]
   loading: boolean
   onRefresh: () => void
@@ -274,15 +298,18 @@ function MonthGrid({
           const inMonth = isSameMonth(day, month)
           const today = isToday(day)
           const dayTodos = inMonth && !loading ? todosForDay(day) : []
+          const dayTimeline = inMonth && !loading ? timelineForDay(day) : []
           const dayCalEvents = inMonth && !loading ? calEventsForDay(day) : []
           const dayKey = format(day, 'yyyy-MM-dd')
           const isAdding = addingDay === dayKey
 
           // 셀에 표시할 항목 수 계산
           const todosVisible = dayTodos.slice(0, maxVisible)
-          const slotsLeft = Math.max(0, maxVisible - todosVisible.length)
+          let slotsLeft = Math.max(0, maxVisible - todosVisible.length)
+          const timelineVisible = dayTimeline.slice(0, slotsLeft)
+          slotsLeft = Math.max(0, slotsLeft - timelineVisible.length)
           const calVisible = dayCalEvents.slice(0, slotsLeft)
-          const overflow = (dayTodos.length - todosVisible.length) + (dayCalEvents.length - calVisible.length)
+          const overflow = (dayTodos.length - todosVisible.length) + (dayTimeline.length - timelineVisible.length) + (dayCalEvents.length - calVisible.length)
 
           return (
             <div
@@ -344,6 +371,30 @@ function MonthGrid({
                     </span>
                   </div>
                 ))}
+
+                {/* App Timeline Entries */}
+                {timelineVisible.map(entry => {
+                  const color = CAT_COLOR[entry.category ?? ''] ?? CAT_COLOR.other
+                  return (
+                    <div
+                      key={entry.id}
+                      onClick={e => e.stopPropagation()}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 2,
+                        padding: `1px ${pad}px`, borderRadius: 3,
+                        background: `${color}22`,
+                        fontSize: todoFont,
+                        color: color,
+                        overflow: 'hidden', flexShrink: 0,
+                      }}
+                    >
+                      <div style={{ width: dot, height: dot, borderRadius: '50%', flexShrink: 0, background: color }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                        {entry.startTime} {entry.title}
+                      </span>
+                    </div>
+                  )
+                })}
 
                 {/* Google Calendar Events */}
                 {calVisible.map(event => (
