@@ -320,8 +320,10 @@ export default function WeeklyBoard() {
   const [addingTodoDay, setAddingTodoDay] = useState<string | null>(null)
   const [highlightOpenDay, setHighlightOpenDay] = useState<string | null>(null)
   const [newTodoTitle, setNewTodoTitle] = useState('')
-  const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number } | null>(null)
+  const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number; startTime?: string } | null>(null)
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
+  const [creationDrag, setCreationDrag] = useState<{ dateKey: string; topY: number; bottomY: number } | null>(null)
+  const creationDragRef = useRef<{ dateKey: string; day: Date; startY: number; startMouseY: number; columnTop: number } | null>(null)
 
   // Repeat state
   const [todoRepeat, setTodoRepeat] = useState(false)
@@ -730,9 +732,9 @@ export default function WeeklyBoard() {
     }
   }
 
-  const submitEntry = async (day: Date, hour: number) => {
+  const submitEntry = async (day: Date, hour: number, overrideStartTime?: string) => {
     if (!newEntry.title.trim()) { setAddingEntry(null); return }
-    const startTime = `${String(hour).padStart(2, '0')}:00`
+    const startTime = overrideStartTime ?? `${String(hour).padStart(2, '0')}:00`
 
     if (entryRepeat) {
       const title = newEntry.title.trim()
@@ -1696,13 +1698,55 @@ export default function WeeklyBoard() {
                   borderLeft: '1px solid var(--border)',
                 }}
                 className="paper-lines"
-                onClick={e => {
-                  if (isAddingHere || didDragRef.current) return
+                onMouseDown={e => {
+                  if (e.button !== 0 || isAddingHere || didDragRef.current) return
                   const rect = e.currentTarget.getBoundingClientRect()
-                  const y = e.clientY - rect.top
-                  const hour = Math.min(LAST_HOUR, FIRST_HOUR + Math.floor(y / ROW_H))
-                  setAddingEntry({ dateKey, hour })
-                  setNewEntry({ title: '', endTime: '', category: '' })
+                  const startY = e.clientY - rect.top
+                  creationDragRef.current = { dateKey, day, startY, startMouseY: e.clientY, columnTop: rect.top }
+
+                  const onMove = (ev: MouseEvent) => {
+                    const drag = creationDragRef.current
+                    if (!drag || drag.dateKey !== dateKey) return
+                    const currentY = Math.max(0, Math.min(TOTAL_H, ev.clientY - drag.columnTop))
+                    if (Math.abs(ev.clientY - drag.startMouseY) > 5) {
+                      setCreationDrag({
+                        dateKey: drag.dateKey,
+                        topY: Math.min(drag.startY, currentY),
+                        bottomY: Math.max(drag.startY, currentY),
+                      })
+                    }
+                  }
+
+                  const onUp = (ev: MouseEvent) => {
+                    document.removeEventListener('mousemove', onMove)
+                    document.removeEventListener('mouseup', onUp)
+                    document.body.style.userSelect = ''
+                    const drag = creationDragRef.current
+                    creationDragRef.current = null
+                    setCreationDrag(null)
+                    if (!drag || didDragRef.current) return
+                    const currentY = Math.max(0, Math.min(TOTAL_H, ev.clientY - drag.columnTop))
+                    const delta = Math.abs(ev.clientY - drag.startMouseY)
+                    if (delta < 8) {
+                      // 클릭 — 기존 동작
+                      const hour = Math.min(LAST_HOUR, FIRST_HOUR + Math.floor(drag.startY / ROW_H))
+                      setAddingEntry({ dateKey: drag.dateKey, hour })
+                      setNewEntry({ title: '', endTime: '', category: '' })
+                    } else {
+                      // 드래그 — 시간 범위 선택
+                      const topY = Math.min(drag.startY, currentY)
+                      const bottomY = Math.max(drag.startY + ROW_H / 4, currentY)
+                      const startTime = yToTime(topY)
+                      const endTime = yToTime(bottomY)
+                      const hour = FIRST_HOUR + Math.floor(topY / ROW_H)
+                      setAddingEntry({ dateKey: drag.dateKey, hour, startTime })
+                      setNewEntry({ title: '', endTime, category: '' })
+                    }
+                  }
+
+                  document.body.style.userSelect = 'none'
+                  document.addEventListener('mousemove', onMove)
+                  document.addEventListener('mouseup', onUp)
                 }}
               >
                 {/* Current time indicator */}
@@ -1742,12 +1786,39 @@ export default function WeeklyBoard() {
                   )
                 })}
 
+                {/* Creation drag preview */}
+                {creationDrag?.dateKey === dateKey && (
+                  <div
+                    className="pointer-events-none"
+                    style={{
+                      position: 'absolute',
+                      top: creationDrag.topY,
+                      height: Math.max(ROW_H / 4, creationDrag.bottomY - creationDrag.topY),
+                      left: 3, right: 3, zIndex: 25,
+                      background: 'var(--accent-dim)',
+                      border: '1px solid var(--accent)',
+                      borderRadius: 6,
+                      opacity: 0.7,
+                    }}
+                  >
+                    <span className="text-[10px] px-1.5 pt-0.5 block" style={{ color: 'var(--accent-light)' }}>
+                      {yToTime(creationDrag.topY)} ~ {yToTime(creationDrag.bottomY)}
+                    </span>
+                  </div>
+                )}
+
                 {/* Inline add form */}
-                {isAddingHere && (
+                {isAddingHere && (() => {
+                  const formStartTime = addingEntry!.startTime ?? `${String(addingEntry!.hour).padStart(2, '0')}:00`
+                  const formTopY = Math.max(0, timeToY(formStartTime))
+                  const formEndTime = newEntry.endTime || addOneHour(formStartTime)
+                  const formHeight = Math.max(64, timeToY(formEndTime) - formTopY)
+                  return (
                   <div
                     style={{
                       position: 'absolute',
-                      top: Math.max(0, (addingEntry!.hour - FIRST_HOUR) * ROW_H),
+                      top: formTopY,
+                      height: formHeight,
                       left: 3, right: 3, zIndex: 30,
                       background: 'var(--bg-card)',
                       border: '1px solid var(--accent-dim)',
@@ -1755,16 +1826,17 @@ export default function WeeklyBoard() {
                     }}
                     className="p-2"
                     onClick={e => e.stopPropagation()}
+                    onMouseDown={e => e.stopPropagation()}
                   >
                     <input
                       type="text"
                       value={newEntry.title}
                       onChange={e => setNewEntry(p => ({ ...p, title: e.target.value }))}
                       onKeyDown={e => {
-                        if (e.key === 'Enter') submitEntry(day, addingEntry!.hour)
+                        if (e.key === 'Enter') submitEntry(day, addingEntry!.hour, addingEntry!.startTime)
                         if (e.key === 'Escape') setAddingEntry(null)
                       }}
-                      placeholder={`${String(addingEntry!.hour).padStart(2, '0')}:00 내용...`}
+                      placeholder={`${addingEntry!.startTime ?? `${String(addingEntry!.hour).padStart(2, '0')}:00`} 내용...`}
                       className="w-full bg-transparent border-none text-[11px] focus:outline-none mb-1.5"
                       style={{ color: 'var(--text)' }}
                       autoFocus
@@ -1814,7 +1886,7 @@ export default function WeeklyBoard() {
                       >
                         TODO
                       </button>
-                      <button onClick={() => submitEntry(day, addingEntry!.hour)} style={{ color: 'var(--accent)' }}>
+                      <button onClick={() => submitEntry(day, addingEntry!.hour, addingEntry!.startTime)} style={{ color: 'var(--accent)' }}>
                         <Check size={12} />
                       </button>
                       <button onClick={() => { setAddingEntry(null); setEntryRepeat(false); setEntryCreateTodo(false) }} style={{ color: 'var(--text-dim)' }}>
@@ -1831,8 +1903,41 @@ export default function WeeklyBoard() {
                         />
                       </div>
                     )}
+                    {/* form resize handle */}
+                    <div
+                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 10, cursor: 'ns-resize', zIndex: 31 }}
+                      className="flex items-center justify-center"
+                      onMouseDown={e => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        const formStartTime = addingEntry!.startTime ?? `${String(addingEntry!.hour).padStart(2, '0')}:00`
+                        const formTopY = timeToY(formStartTime)
+                        const currentEndTime = newEntry.endTime || addOneHour(formStartTime)
+                        const startEndY = timeToY(currentEndTime)
+                        const startMouseY = e.clientY
+
+                        const onMove = (ev: MouseEvent) => {
+                          const delta = ev.clientY - startMouseY
+                          const newEndY = Math.max(formTopY + ROW_H / 4, startEndY + delta)
+                          setNewEntry(p => ({ ...p, endTime: yToTime(newEndY) }))
+                        }
+                        const onUp = () => {
+                          document.removeEventListener('mousemove', onMove)
+                          document.removeEventListener('mouseup', onUp)
+                          document.body.style.cursor = ''
+                          document.body.style.userSelect = ''
+                        }
+                        document.body.style.cursor = 'ns-resize'
+                        document.body.style.userSelect = 'none'
+                        document.addEventListener('mousemove', onMove)
+                        document.addEventListener('mouseup', onUp)
+                      }}
+                    >
+                      <div className="w-8 h-[2px] rounded-full opacity-40" style={{ background: 'var(--accent)' }} />
+                    </div>
                   </div>
-                )}
+                  )
+                })()}
               </div>
             )
           })}
