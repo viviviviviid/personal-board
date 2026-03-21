@@ -866,7 +866,7 @@ export default function WeeklyBoard() {
 
         {/* Row 2: Navigation */}
         {(view === 'weekly' || view === 'matrix') && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => navigateWeek('prev')}
               className="rounded-lg transition-all flex items-center justify-center"
@@ -899,8 +899,8 @@ export default function WeeklyBoard() {
               <ChevronRight size={isMobile ? 18 : 15} />
             </button>
             {!isMobile && view === 'weekly' && <AIFeedback weekStart={currentWeekStart} />}
-            {view === 'weekly' && (
-              <div className="flex rounded-lg overflow-hidden ml-auto" style={{ border: '1px solid var(--border)' }}>
+            {view === 'weekly' && isMobile && (
+              <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
                 {[1, 2, 3, 5].map((n, i, arr) => (
                   <button
                     key={n}
@@ -1299,7 +1299,7 @@ export default function WeeklyBoard() {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {dayTodos.slice(0, todoRows).map(todo => (
+                    {dayTodos.slice(0, isMobile ? todoRows : undefined).map(todo => (
                       <div
                         key={todo.id}
                         className="flex items-center gap-1.5 group px-1.5 py-1.5 rounded-lg transition-colors"
@@ -1379,7 +1379,7 @@ export default function WeeklyBoard() {
                         </button>
                       </div>
                     ))}
-                    {dayTodos.length > todoRows && (
+                    {isMobile && dayTodos.length > todoRows && (
                       <div
                         className="px-1.5 py-0.5 text-[11px] rounded cursor-default"
                         style={{ color: 'var(--text-dim)' }}
