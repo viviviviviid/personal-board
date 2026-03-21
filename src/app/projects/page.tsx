@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, X, ChevronRight, FolderKanban, Target } from 'lucide-react'
+import { Plus, X, ChevronRight, FolderKanban, Target, Trash2 } from 'lucide-react'
 
 interface Project {
   id: string
@@ -27,6 +27,7 @@ export default function ProjectsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [formData, setFormData] = useState({ name: '', description: '', color: '#c78928', goal: '' })
   const [creating, setCreating] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
 
   const fetchProjects = async () => {
     try {
@@ -64,11 +65,9 @@ export default function ProjectsPage() {
     }
   }
 
-  const deleteProject = async (projectId: string, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!confirm('프로젝트를 삭제하시겠습니까? 모든 할일도 함께 삭제됩니다.')) return
+  const deleteProject = async (projectId: string) => {
     setProjects((prev) => prev.filter((p) => p.id !== projectId))
+    setConfirmDelete(null)
     try {
       await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
     } catch {
@@ -155,13 +154,13 @@ export default function ProjectsPage() {
                     </h3>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={(e) => deleteProject(project.id, e)}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDelete({ id: project.id, name: project.name }) }}
                         className="opacity-0 group-hover:opacity-100 p-1 rounded transition-all"
                         style={{ color: 'var(--text-dim)' }}
                         onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger)')}
                         onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
                       >
-                        <X size={14} />
+                        <Trash2 size={14} />
                       </button>
                       <ChevronRight size={16} style={{ color: 'var(--text-dim)' }} />
                     </div>
@@ -201,6 +200,51 @@ export default function ProjectsPage() {
               </Link>
             )
           })}
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 backdrop-blur-sm"
+            style={{ background: 'rgba(10,8,4,0.7)' }}
+            onClick={() => setConfirmDelete(null)}
+          />
+          <div
+            className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+          >
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center mb-4"
+              style={{ background: 'rgba(239,68,68,0.1)' }}
+            >
+              <Trash2 size={18} style={{ color: 'var(--danger)' }} />
+            </div>
+            <h3 className="font-semibold mb-1" style={{ color: 'var(--text-bright)' }}>프로젝트 삭제</h3>
+            <p className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
+              <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>"{confirmDelete.name}"</span>을 삭제할까요?
+            </p>
+            <p className="text-xs mb-6" style={{ color: 'var(--text-dim)' }}>
+              프로젝트 내 모든 할일이 함께 삭제되며 복구할 수 없습니다.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 py-2 text-sm rounded-xl"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                취소
+              </button>
+              <button
+                onClick={() => deleteProject(confirmDelete.id)}
+                className="flex-1 py-2 text-sm rounded-xl font-medium"
+                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger)' }}
+              >
+                삭제
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSwipe } from '@/hooks/useSwipe'
 import { format, subDays, addDays } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { Plus, Check, X, Flame, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -42,6 +43,7 @@ export default function HabitsPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [formData, setFormData] = useState({ name: '', emoji: '✨', color: '#c78928' })
   const [adding, setAdding] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
 
   const dateStr = format(currentDate, 'yyyy-MM-dd')
 
@@ -114,8 +116,8 @@ export default function HabitsPage() {
   }
 
   const deleteHabit = async (habitId: string) => {
-    if (!confirm('습관을 삭제하시겠습니까?')) return
     setHabits((prev) => prev.filter((h) => h.id !== habitId))
+    setConfirmDelete(null)
     try {
       await fetch(`/api/habits/${habitId}`, { method: 'DELETE' })
     } catch {
@@ -126,52 +128,25 @@ export default function HabitsPage() {
   const completedCount = habits.filter((h) => h.logs.some((l) => l.completed)).length
   const isToday = format(currentDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
+  const [slideDir, setSlideDir] = useState<'next' | 'prev' | null>(null)
+
+  const swipeHandlers = useSwipe(
+    () => { setSlideDir('next'); setCurrentDate(d => addDays(d, 1)) },
+    () => { setSlideDir('prev'); setCurrentDate(d => subDays(d, 1)) },
+  )
+
   return (
-    <div>
+    <div {...swipeHandlers} style={{ minHeight: '100%' }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-bright)' }}>
             <Flame style={{ color: 'var(--warning)' }} size={22} />
             습관 트래커
           </h2>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {format(currentDate, 'yyyy년 MM월 dd일 (EEEE)', { locale: ko })}
-            {isToday && (
-              <span
-                className="ml-2 px-2 py-0.5 text-xs rounded-full"
-                style={{ background: 'rgba(199,137,40,0.15)', color: 'var(--accent-light)', border: '1px solid rgba(199,137,40,0.3)' }}
-              >
-                오늘
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setCurrentDate((d) => subDays(d, 1))}
-            className="p-2 rounded-lg transition-all"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <button
-            onClick={() => setCurrentDate(new Date())}
-            className="px-3 py-1.5 text-xs rounded-lg transition-all"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-          >
-            오늘
-          </button>
-          <button
-            onClick={() => setCurrentDate((d) => addDays(d, 1))}
-            className="p-2 rounded-lg transition-all"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-          >
-            <ChevronRight size={18} />
-          </button>
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-all ml-1"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-all"
             style={{
               background: showAddForm ? 'var(--bg-card)' : 'var(--accent-dim)',
               border: '1px solid var(--border)',
@@ -182,7 +157,49 @@ export default function HabitsPage() {
             <span className="hidden sm:inline">{showAddForm ? '닫기' : '새 습관'}</span>
           </button>
         </div>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            {format(currentDate, 'MM월 dd일 (EEEE)', { locale: ko })}
+            {isToday && (
+              <span
+                className="ml-2 px-2 py-0.5 text-xs rounded-full"
+                style={{ background: 'rgba(199,137,40,0.15)', color: 'var(--accent-light)', border: '1px solid rgba(199,137,40,0.3)' }}
+              >
+                오늘
+              </span>
+            )}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => { setSlideDir('prev'); setCurrentDate((d) => subDays(d, 1)) }}
+              className="p-1.5 rounded-lg transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button
+              onClick={() => setCurrentDate(new Date())}
+              className="px-2.5 py-1 text-xs rounded-lg transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+            >
+              오늘
+            </button>
+            <button
+              onClick={() => { setSlideDir('next'); setCurrentDate((d) => addDays(d, 1)) }}
+              className="p-1.5 rounded-lg transition-all"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
       </div>
+
+      <div
+        key={dateStr}
+        className={slideDir === 'next' ? 'week-slide-next' : slideDir === 'prev' ? 'week-slide-prev' : ''}
+        onAnimationEnd={() => setSlideDir(null)}
+      >
 
       {error && (
         <div
@@ -366,9 +383,11 @@ export default function HabitsPage() {
                   )}
 
                   <button
-                    onClick={() => deleteHabit(habit.id)}
-                    className="opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                    onClick={() => setConfirmDelete({ id: habit.id, name: habit.name })}
+                    className="md:opacity-0 md:group-hover:opacity-100 transition-all flex-shrink-0 p-1 rounded"
                     style={{ color: 'var(--text-dim)' }}
+                    onTouchStart={e => (e.currentTarget.style.opacity = '1')}
+                    onTouchEnd={e => (e.currentTarget.style.opacity = '')}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -395,6 +414,49 @@ export default function HabitsPage() {
               </div>
             )
           })}
+        </div>
+      )}
+      </div>
+
+      {/* Delete Confirm Modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 backdrop-blur-sm"
+            style={{ background: 'rgba(10,8,4,0.7)' }}
+            onClick={() => setConfirmDelete(null)}
+          />
+          <div
+            className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+          >
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center mb-4"
+              style={{ background: 'rgba(239,68,68,0.1)' }}
+            >
+              <Trash2 size={18} style={{ color: 'var(--danger)' }} />
+            </div>
+            <h3 className="font-semibold mb-1" style={{ color: 'var(--text-bright)' }}>습관 삭제</h3>
+            <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
+              <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>"{confirmDelete.name}"</span>을 삭제할까요?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 py-2 text-sm rounded-xl"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                취소
+              </button>
+              <button
+                onClick={() => deleteHabit(confirmDelete.id)}
+                className="flex-1 py-2 text-sm rounded-xl font-medium"
+                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger)' }}
+              >
+                삭제
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

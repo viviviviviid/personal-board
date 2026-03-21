@@ -11,8 +11,8 @@ export default function PWARegister() {
     // 이미 설치된 경우
     setIsStandalone(window.matchMedia('(display-mode: standalone)').matches)
 
-    // 서비스워커 등록
-    if ('serviceWorker' in navigator) {
+    // 서비스워커 등록 (production only)
+    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
     }
 

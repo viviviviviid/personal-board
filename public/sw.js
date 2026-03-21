@@ -21,6 +21,8 @@ self.addEventListener('fetch', e => {
   if (!url.startsWith(self.location.origin)) return
   if (url.includes('/api/')) return
 
+  if (e.request.method !== 'GET') return
+
   e.respondWith(
     fetch(e.request)
       .then(res => {

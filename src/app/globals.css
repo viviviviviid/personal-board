@@ -35,6 +35,33 @@
   --font-hand:    var(--font-caveat), 'Caveat', sans-serif;
 }
 
+/* ── Light Theme ─────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:      #F4F4F5;
+  --bg-surface:   #FFFFFF;
+  --bg-card:      #FAFAFA;
+  --bg-input:     #EFEFEF;
+  --bg-hover:     #E4E4E7;
+
+  --border:       #D4D4D8;
+  --border-dim:   #E4E4E7;
+  --border-rule:  #A1A1AA;
+
+  --text:         #3F3F46;
+  --text-bright:  #18181B;
+  --text-muted:   #71717A;
+  --text-dim:     #A1A1AA;
+
+  --accent:       #7C3AED;
+  --accent-light: #8B5CF6;
+  --accent-dim:   #EDE9FE;
+
+  --success:      #059669;
+  --success-dim:  #D1FAE5;
+  --danger:       #DC2626;
+  --warning:      #D97706;
+}
+
 @theme inline {
   --color-background: var(--bg-base);
   --color-foreground: var(--text);
@@ -96,6 +123,14 @@ body {
 }
 .week-slide-prev {
   animation: slide-in-from-left 0.18s ease-out;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.settings-slide-up {
+  animation: slide-up 0.25s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .line-through {
