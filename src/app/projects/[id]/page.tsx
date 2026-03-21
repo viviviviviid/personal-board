@@ -185,12 +185,14 @@ function TodoItem({
 function AddTodoInline({
   forKey,
   addingFor,
+  isMobile,
   onOpen,
   onClose,
   onAdd,
 }: {
   forKey: string
   addingFor: string
+  isMobile: boolean
   onOpen: () => void
   onClose: () => void
   onAdd: (title: string, date: string | null) => void
@@ -212,7 +214,9 @@ function AddTodoInline({
 
   const imeProps = useImeInput(submit, cancel)
 
-  if (addingFor !== forKey) {
+  const isActive = addingFor === forKey
+
+  if (!isActive) {
     return (
       <button
         onClick={onOpen}
@@ -223,6 +227,18 @@ function AddTodoInline({
       >
         <Plus size={12} /><span>할일 추가</span>
       </button>
+    )
+  }
+
+  // 모바일: 고정 바텀 시트가 처리하므로 인디케이터만 표시
+  if (isMobile) {
+    return (
+      <div
+        className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg"
+        style={{ color: 'var(--accent-light)', background: 'var(--accent-dim)' }}
+      >
+        <Plus size={12} /><span>입력 중...</span>
+      </div>
     )
   }
 
@@ -349,6 +365,27 @@ export default function ProjectDetailPage() {
   const [addingFor, setAddingFor] = useState<string>(CLOSED)
   const [addingSectionTitle, setAddingSectionTitle] = useState(false)
   const [newSectionTitle, setNewSectionTitle] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  // 모바일 바텀 시트용 임시 상태
+  const [mobileTodoTitle, setMobileTodoTitle] = useState('')
+  const [mobileTodoDate, setMobileTodoDate] = useState('')
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  const deleteProject = async () => {
+    try {
+      await fetch(`/api/projects/${projectId}`, { method: 'DELETE' })
+      router.push('/projects')
+    } catch {
+      setConfirmDelete(false)
+    }
+  }
 
   const fetchProject = useCallback(async () => {
     try {
@@ -423,6 +460,8 @@ export default function ProjectDetailPage() {
       : p
     )
     setAddingFor(CLOSED)
+    setMobileTodoTitle('')
+    setMobileTodoDate('')
 
     try {
       const res = await fetch('/api/todos', {
@@ -475,7 +514,24 @@ export default function ProjectDetailPage() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center py-24" style={{ color: 'var(--text-dim)' }}>로딩 중...</div>
+    return (
+      <div className="space-y-4 max-w-2xl">
+        {/* 헤더 스켈레톤 */}
+        <div className="h-4 w-24 rounded-full animate-pulse" style={{ background: 'var(--bg-card)' }} />
+        <div className="flex items-start gap-4 mb-6">
+          <div className="w-1 h-20 rounded-full animate-pulse" style={{ background: 'var(--bg-card)' }} />
+          <div className="flex-1 space-y-2">
+            <div className="h-6 w-48 rounded-full animate-pulse" style={{ background: 'var(--bg-card)' }} />
+            <div className="h-3 w-64 rounded-full animate-pulse" style={{ background: 'var(--bg-card)' }} />
+            <div className="h-2 w-32 rounded-full animate-pulse mt-3" style={{ background: 'var(--bg-card)' }} />
+          </div>
+        </div>
+        {/* 카드 스켈레톤 */}
+        {[1, 2].map(i => (
+          <div key={i} className="rounded-xl h-32 animate-pulse" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-dim)' }} />
+        ))}
+      </div>
+    )
   }
   if (error || !project) {
     return (
@@ -494,15 +550,25 @@ export default function ProjectDetailPage() {
     <div>
       {/* Header */}
       <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
         <Link
           href="/projects"
-          className="inline-flex items-center gap-1 text-sm mb-4 transition-colors"
+          className="inline-flex items-center gap-1 text-sm transition-colors"
           style={{ color: 'var(--text-muted)' }}
           onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-bright)')}
           onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
         >
           <ChevronLeft size={16} />프로젝트 목록
         </Link>
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="p-1.5 rounded-lg transition-all"
+          style={{ color: 'var(--text-dim)', background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+          title="프로젝트 삭제"
+        >
+          <Trash2 size={15} />
+        </button>
+        </div>
 
         <div className="flex items-start gap-4">
           <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ backgroundColor: project.color }} />
@@ -553,7 +619,8 @@ export default function ProjectDetailPage() {
             <AddTodoInline
               forKey={UNSECTIONED}
               addingFor={addingFor}
-              onOpen={() => setAddingFor(UNSECTIONED)}
+              isMobile={isMobile}
+              onOpen={() => { setAddingFor(UNSECTIONED); setMobileTodoTitle(''); setMobileTodoDate('') }}
               onClose={() => setAddingFor(CLOSED)}
               onAdd={(title, date) => addTodo(UNSECTIONED, title, date)}
             />
@@ -585,7 +652,8 @@ export default function ProjectDetailPage() {
                   <AddTodoInline
                     forKey={section.id}
                     addingFor={addingFor}
-                    onOpen={() => setAddingFor(section.id)}
+                    isMobile={isMobile}
+                    onOpen={() => { setAddingFor(section.id); setMobileTodoTitle(''); setMobileTodoDate('') }}
                     onClose={() => setAddingFor(CLOSED)}
                     onAdd={(title, date) => addTodo(section.id, title, date)}
                   />
@@ -596,7 +664,7 @@ export default function ProjectDetailPage() {
         })}
 
         {/* Add Section */}
-        {addingSectionTitle ? (
+        {addingSectionTitle && !isMobile ? (
           <form onSubmit={addSection} className="flex gap-2">
             <input
               type="text"
@@ -615,9 +683,16 @@ export default function ProjectDetailPage() {
               취소
             </button>
           </form>
+        ) : addingSectionTitle && isMobile ? (
+          <button
+            className="flex items-center gap-2 px-4 py-2.5 w-full text-sm rounded-xl"
+            style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent)', color: 'var(--accent-light)' }}
+          >
+            <Plus size={16} />섹션 입력 중...
+          </button>
         ) : (
           <button
-            onClick={() => setAddingSectionTitle(true)}
+            onClick={() => { setAddingSectionTitle(true); setNewSectionTitle('') }}
             className="flex items-center gap-2 px-4 py-2.5 w-full text-sm rounded-xl transition-all"
             style={{ background: 'var(--bg-card)', border: '1px dashed var(--border)', color: 'var(--text-dim)' }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent-dim)'; e.currentTarget.style.color = 'var(--accent)' }}
@@ -627,6 +702,170 @@ export default function ProjectDetailPage() {
           </button>
         )}
       </div>
+
+      {/* 모바일 할일 추가 바텀 시트 */}
+      {isMobile && addingFor !== CLOSED && (
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1000,
+            background: 'var(--bg-surface)',
+            borderTop: '1px solid var(--border)',
+            padding: '12px 16px',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={mobileTodoTitle}
+                onChange={e => setMobileTodoTitle(e.target.value)}
+                onKeyDown={e => {
+                  if (e.nativeEvent.isComposing) return
+                  if (e.key === 'Enter' && mobileTodoTitle.trim()) {
+                    addTodo(addingFor, mobileTodoTitle.trim(), mobileTodoDate || null)
+                  }
+                  if (e.key === 'Escape') { setAddingFor(CLOSED); setMobileTodoTitle(''); setMobileTodoDate('') }
+                }}
+                placeholder="할일 이름..."
+                className="flex-1 text-[14px] focus:outline-none rounded-xl px-3 py-2.5"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--accent-dim)', color: 'var(--text)' }}
+                autoFocus
+              />
+              <button
+                onClick={() => {
+                  if (mobileTodoTitle.trim()) addTodo(addingFor, mobileTodoTitle.trim(), mobileTodoDate || null)
+                }}
+                className="p-2.5 rounded-xl flex-shrink-0"
+                style={{ background: 'var(--accent-dim)', color: 'var(--accent-light)', border: '1px solid var(--accent)' }}
+              >
+                <Check size={16} />
+              </button>
+              <button
+                onClick={() => { setAddingFor(CLOSED); setMobileTodoTitle(''); setMobileTodoDate('') }}
+                className="p-2.5 rounded-xl flex-shrink-0"
+                style={{ background: 'var(--bg-card)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2 px-1">
+              <Calendar size={12} style={{ color: 'var(--text-dim)' }} />
+              <input
+                type="date"
+                value={mobileTodoDate}
+                onChange={e => setMobileTodoDate(e.target.value)}
+                className="text-xs focus:outline-none rounded-lg px-2 py-1.5"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              />
+              {mobileTodoDate && (
+                <button onClick={() => setMobileTodoDate('')} className="text-[11px]" style={{ color: 'var(--text-dim)' }}>
+                  기한 제거
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 모바일 섹션 추가 바텀 시트 */}
+      {isMobile && addingSectionTitle && (
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1000,
+            background: 'var(--bg-surface)',
+            borderTop: '1px solid var(--border)',
+            padding: '12px 16px',
+            paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newSectionTitle}
+              onChange={e => setNewSectionTitle(e.target.value)}
+              onKeyDown={e => {
+                if (e.nativeEvent.isComposing) return
+                if (e.key === 'Enter') { addSection(e as unknown as React.FormEvent); }
+                if (e.key === 'Escape') { setAddingSectionTitle(false); setNewSectionTitle('') }
+              }}
+              placeholder="섹션 이름..."
+              className="flex-1 text-[14px] focus:outline-none rounded-xl px-3 py-2.5"
+              style={{ background: 'var(--bg-input)', border: '1px solid var(--accent-dim)', color: 'var(--text)' }}
+              autoFocus
+            />
+            <button
+              onClick={e => addSection(e as unknown as React.FormEvent)}
+              className="p-2.5 rounded-xl flex-shrink-0"
+              style={{ background: 'var(--accent-dim)', color: 'var(--accent-light)', border: '1px solid var(--accent)' }}
+            >
+              <Check size={16} />
+            </button>
+            <button
+              onClick={() => { setAddingSectionTitle(false); setNewSectionTitle('') }}
+              className="p-2.5 rounded-xl flex-shrink-0"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {confirmDelete && project && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 backdrop-blur-sm"
+            style={{ background: 'rgba(10,8,4,0.7)' }}
+            onClick={() => setConfirmDelete(false)}
+          />
+          <div
+            className="relative w-full max-w-sm rounded-2xl p-6 shadow-2xl"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+          >
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center mb-4"
+              style={{ background: 'rgba(239,68,68,0.1)' }}
+            >
+              <Trash2 size={18} style={{ color: 'var(--danger)' }} />
+            </div>
+            <h3 className="font-semibold mb-1" style={{ color: 'var(--text-bright)' }}>프로젝트 삭제</h3>
+            <p className="text-sm mb-1" style={{ color: 'var(--text-muted)' }}>
+              <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>"{project.name}"</span>을 삭제할까요?
+            </p>
+            <p className="text-xs mb-6" style={{ color: 'var(--text-dim)' }}>
+              프로젝트 내 모든 할일이 함께 삭제되며 복구할 수 없습니다.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2 text-sm rounded-xl"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                취소
+              </button>
+              <button
+                onClick={deleteProject}
+                className="flex-1 py-2 text-sm rounded-xl font-medium"
+                style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger)' }}
+              >
+                삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

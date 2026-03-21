@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSwipe } from '@/hooks/useSwipe'
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink, AlertCircle } from 'lucide-react'
 import { signIn } from 'next-auth/react'
@@ -241,11 +242,24 @@ export default function WeeklyBoard() {
   const [now, setNow] = useState(new Date())
 
   const [slideDir, setSlideDir] = useState<'next' | 'prev' | null>(null)
+  const [monthSlideDir, setMonthSlideDir] = useState<'next' | 'prev' | null>(null)
+  const gridScrollRef = useRef<HTMLDivElement>(null)
 
   const [addingTodoDay, setAddingTodoDay] = useState<string | null>(null)
+  const [highlightOpenDay, setHighlightOpenDay] = useState<string | null>(null)
   const [newTodoTitle, setNewTodoTitle] = useState('')
   const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number } | null>(null)
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
+  const [onboardingDone, setOnboardingDone] = useState(true) // default true — localStorage로 덮어씀
+
+  useEffect(() => {
+    if (!localStorage.getItem('pb-onboarding-done')) setOnboardingDone(false)
+  }, [])
+
+  const dismissOnboarding = () => {
+    localStorage.setItem('pb-onboarding-done', '1')
+    setOnboardingDone(true)
+  }
 
   // Google Calendar 목록 fetch
   const fetchCalendarList = useCallback(async () => {
@@ -341,6 +355,71 @@ export default function WeeklyBoard() {
     setSlideDir(dir)
     setCurrentWeekStart(d => dir === 'next' ? addWeeks(d, 1) : subWeeks(d, 1))
   }, [])
+
+  const navigateDay = useCallback((dir: 'next' | 'prev') => {
+    if (!isMobile) {
+      navigateWeek(dir)
+      return
+    }
+    if (dir === 'next') {
+      if (mobileDay < 6) {
+        setMobileDay(d => d + 1)
+      } else {
+        setSlideDir('next')
+        setCurrentWeekStart(d => addWeeks(d, 1))
+        setMobileDay(0)
+      }
+    } else {
+      if (mobileDay > 0) {
+        setMobileDay(d => d - 1)
+      } else {
+        setSlideDir('prev')
+        setCurrentWeekStart(d => subWeeks(d, 1))
+        setMobileDay(6)
+      }
+    }
+  }, [isMobile, mobileDay, navigateWeek])
+
+  // 타임라인 스크롤 초기 위치
+  useEffect(() => {
+    const el = gridScrollRef.current
+    if (!el) return
+
+    const DEFAULT_HOUR = 9
+    const defaultY = (DEFAULT_HOUR - FIRST_HOUR) * ROW_H  // 9시 = 208px
+
+    // 모바일: 선택된 날짜, 데스크탑: 주 첫날 기준
+    const targetDay = isMobile ? weekDays[mobileDay] : weekDays[0]
+    const dayEntries = timeline
+      .filter(e => isSameDay(new Date(e.date), targetDay))
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+
+    let scrollY: number
+    if (dayEntries.length > 0) {
+      const [h, m] = dayEntries[0].startTime.split(':').map(Number)
+      const entryY = (h - FIRST_HOUR) * ROW_H + (m / 60) * ROW_H
+      // 이벤트 위에 여백 확보, 최소 0, 최대는 브라우저가 자연히 클램프
+      scrollY = Math.max(0, entryY - 80)
+    } else {
+      scrollY = defaultY
+    }
+
+    const timer = setTimeout(() => {
+      el.scrollTo({ top: scrollY, behavior: 'instant' as ScrollBehavior })
+    }, 30)
+    return () => clearTimeout(timer)
+  }, [currentWeekStart, mobileDay, loading])
+
+  const swipeHandlers = useSwipe(
+    () => {
+      if (view === 'monthly') { setMonthSlideDir('next'); setCurrentMonth(d => addMonths(d, 1)) }
+      else navigateDay('next')
+    },
+    () => {
+      if (view === 'monthly') { setMonthSlideDir('prev'); setCurrentMonth(d => subMonths(d, 1)) }
+      else navigateDay('prev')
+    },
+  )
 
   // 좌우 화살표 키로 주 이동
   useEffect(() => {
@@ -619,7 +698,7 @@ export default function WeeklyBoard() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }} {...swipeHandlers}>
 
       {/* Header — 2-row layout */}
       <div className="flex flex-col gap-2 mb-3 flex-shrink-0">
@@ -649,7 +728,7 @@ export default function WeeklyBoard() {
                   }}
                 >
                   {isMobile
-                    ? (v === 'weekly' ? '주' : v === 'monthly' ? '월' : '매')
+                    ? (v === 'weekly' ? '주' : v === 'monthly' ? '월' : 'M')
                     : (v === 'weekly' ? '주간' : v === 'monthly' ? '월간' : '매트릭스')}
                 </button>
               ))}
@@ -756,24 +835,34 @@ export default function WeeklyBoard() {
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => navigateWeek('prev')}
-              className="p-1.5 rounded-lg transition-all"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              className="rounded-lg transition-all flex items-center justify-center"
+              style={{
+                background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)',
+                padding: isMobile ? '8px 12px' : '6px',
+              }}
             >
-              <ChevronLeft size={15} />
+              <ChevronLeft size={isMobile ? 18 : 15} />
             </button>
             <button
               onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
-              className="px-2.5 py-1 text-xs rounded-lg transition-all"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              className="rounded-lg transition-all"
+              style={{
+                background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)',
+                padding: isMobile ? '7px 14px' : '4px 10px',
+                fontSize: isMobile ? 13 : 12,
+              }}
             >
               이번 주
             </button>
             <button
               onClick={() => navigateWeek('next')}
-              className="p-1.5 rounded-lg transition-all"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              className="rounded-lg transition-all flex items-center justify-center"
+              style={{
+                background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)',
+                padding: isMobile ? '8px 12px' : '6px',
+              }}
             >
-              <ChevronRight size={15} />
+              <ChevronRight size={isMobile ? 18 : 15} />
             </button>
             {!isMobile && view === 'weekly' && <AIFeedback weekStart={currentWeekStart} />}
           </div>
@@ -799,7 +888,7 @@ export default function WeeklyBoard() {
               </div>
             )}
             <button
-              onClick={() => setCurrentMonth(d => subMonths(d, 1))}
+              onClick={() => { setMonthSlideDir('prev'); setCurrentMonth(d => subMonths(d, 1)) }}
               className="p-1.5 rounded-lg transition-all"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
             >
@@ -813,7 +902,7 @@ export default function WeeklyBoard() {
               이번 달
             </button>
             <button
-              onClick={() => setCurrentMonth(d => addMonths(d, 1))}
+              onClick={() => { setMonthSlideDir('next'); setCurrentMonth(d => addMonths(d, 1)) }}
               className="p-1.5 rounded-lg transition-all"
               style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
             >
@@ -837,12 +926,19 @@ export default function WeeklyBoard() {
       )}
 
       {view === 'monthly' && (
-        <MonthlyCalendar
-          currentMonth={currentMonth}
-          monthCount={monthCount}
-          enabledCalendars={monthlyEnabledCals}
-          calendarList={calendarList}
-        />
+        <div
+          key={format(currentMonth, 'yyyy-MM')}
+          className={monthSlideDir === 'next' ? 'week-slide-next' : monthSlideDir === 'prev' ? 'week-slide-prev' : ''}
+          onAnimationEnd={() => setMonthSlideDir(null)}
+          style={{ flex: 1, minHeight: 0 }}
+        >
+          <MonthlyCalendar
+            currentMonth={currentMonth}
+            monthCount={monthCount}
+            enabledCalendars={monthlyEnabledCals}
+            calendarList={calendarList}
+          />
+        </div>
       )}
 
       {/* 모바일 날짜 탭 */}
@@ -890,8 +986,105 @@ export default function WeeklyBoard() {
       )}
 
       {/* Grid */}
+      {/* 모바일 TODO 입력 — 키보드 올라와도 레이아웃 밀림 없음 */}
+      {isMobile && addingTodoDay && (
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1000,
+            background: 'var(--bg-surface)',
+            borderTop: '1px solid var(--border)',
+            padding: '10px 16px',
+            paddingBottom: 'max(10px, env(safe-area-inset-bottom))',
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.3)',
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={newTodoTitle}
+              onChange={e => setNewTodoTitle(e.target.value)}
+              onKeyDown={e => {
+                if (e.nativeEvent.isComposing) return
+                if (e.key === 'Enter') {
+                  const day = weekDays.find(d => format(d, 'yyyy-MM-dd') === addingTodoDay)
+                  if (day) submitTodo(day)
+                }
+                if (e.key === 'Escape') { setAddingTodoDay(null); setNewTodoTitle('') }
+              }}
+              placeholder="할일 추가..."
+              className="flex-1 text-[14px] focus:outline-none rounded-xl px-3 py-2.5"
+              style={{
+                background: 'var(--bg-input)',
+                border: '1px solid var(--accent-dim)',
+                color: 'var(--text)',
+              }}
+              autoFocus
+            />
+            <button
+              onClick={() => {
+                const day = weekDays.find(d => format(d, 'yyyy-MM-dd') === addingTodoDay)
+                if (day) submitTodo(day)
+              }}
+              className="p-2.5 rounded-xl flex-shrink-0"
+              style={{ background: 'var(--accent-dim)', color: 'var(--accent-light)', border: '1px solid var(--accent)' }}
+            >
+              <Check size={16} />
+            </button>
+            <button
+              onClick={() => { setAddingTodoDay(null); setNewTodoTitle('') }}
+              className="p-2.5 rounded-xl flex-shrink-0"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 온보딩 배너 ─────────────────────────────────────────────────── */}
+      {view === 'weekly' && !loading && !onboardingDone && (
+        <div
+          className="flex-shrink-0 rounded-xl p-4 mb-3"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--accent-dim)' }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold mb-2" style={{ color: 'var(--accent-light)' }}>
+                Personal Board에 오신 것을 환영합니다
+              </div>
+              <div className="space-y-1.5 text-[12px]" style={{ color: 'var(--text-muted)' }}>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>TO-DO</span>
+                  <span>날짜 아래 <b style={{ color: 'var(--text)' }}>+ 추가</b>를 눌러 할일을 등록하세요</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>Timeline</span>
+                  <span>타임라인 칸을 클릭해 시간 기록을 추가하세요</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded font-mono flex-shrink-0" style={{ background: 'var(--bg-input)', border: '1px solid var(--border)' }}>★</span>
+                  <span>헤더의 별표로 오늘의 하이라이트를 설정하세요</span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={dismissOnboarding}
+              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+              style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent)', color: 'var(--accent-light)' }}
+            >
+              시작하기
+            </button>
+          </div>
+        </div>
+      )}
+
       {view === 'weekly' && <div
         key={currentWeekStart.toISOString()}
+        ref={gridScrollRef}
         className={`flex-1 overflow-auto rounded-xl${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
         style={{ minWidth: 0, border: '1px solid var(--border)' }}
         onAnimationEnd={() => setSlideDir(null)}
@@ -910,6 +1103,8 @@ export default function WeeklyBoard() {
           {visibleDays.map((day) => {
             const wi = weekDays.indexOf(day)
             const today = isToday(day)
+            const dayKey = format(day, 'yyyy-MM-dd')
+            const hasHighlight = highlights.some(x => x.date === dayKey)
             return (
               <div
                 key={wi}
@@ -920,51 +1115,68 @@ export default function WeeklyBoard() {
                   borderBottom: '1px solid var(--border)',
                 }}
               >
-                <div
-                  className="text-[11px] font-semibold tracking-wide"
-                  style={{ color: today ? 'var(--accent)' : wi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}
-                >
-                  {DAYS_KO[wi]}
-                </div>
-                <div
-                  className="text-xl font-bold leading-tight"
-                  style={{ color: today ? 'var(--accent-light)' : 'var(--text-bright)' }}
-                >
-                  {format(day, 'd')}
-                </div>
-                <div className="text-[9px]" style={{ color: 'var(--text-dim)' }}>{format(day, 'MM/dd')}</div>
+                {isMobile ? (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-[11px] font-semibold" style={{ color: today ? 'var(--accent)' : 'var(--text-dim)' }}>{DAYS_KO[wi]}</span>
+                      <span className="text-lg font-bold leading-none" style={{ color: today ? 'var(--accent-light)' : 'var(--text-bright)' }}>{format(day, 'd')}</span>
+                    </div>
+                    <button
+                      onClick={() => setHighlightOpenDay(d => d === dayKey ? null : dayKey)}
+                      className="text-sm leading-none px-1.5 py-0.5 rounded transition-all"
+                      style={{
+                        color: hasHighlight || highlightOpenDay === dayKey ? '#ca8a04' : 'rgba(202,138,4,0.3)',
+                        background: highlightOpenDay === dayKey ? 'rgba(234,179,8,0.1)' : 'transparent',
+                      }}
+                    >★</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-[11px] font-semibold tracking-wide" style={{ color: today ? 'var(--accent)' : wi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}>{DAYS_KO[wi]}</div>
+                    <div className="text-xl font-bold leading-tight" style={{ color: today ? 'var(--accent-light)' : 'var(--text-bright)' }}>{format(day, 'd')}</div>
+                    <div className="text-[9px]" style={{ color: 'var(--text-dim)' }}>{format(day, 'MM/dd')}</div>
+                  </>
+                )}
               </div>
             )
           })}
 
           {/* ── Highlight section ── */}
-          <div
-            className="flex items-center justify-end pr-1.5"
-            style={{ background: 'rgba(234,179,8,0.06)', borderBottom: '1px solid var(--border)', minHeight: 40 }}
-          >
-            <span className="text-[9px] tracking-widest font-semibold" style={{ color: '#ca8a04' }}>★</span>
-          </div>
+          {!isMobile && (
+            <div
+              className="flex items-center justify-end pr-1.5"
+              style={{ background: 'rgba(234,179,8,0.06)', borderBottom: '1px solid var(--border)', minHeight: 40 }}
+            >
+              <span className="text-[9px] tracking-widest font-semibold" style={{ color: '#ca8a04' }}>★</span>
+            </div>
+          )}
           {visibleDays.map((day) => {
             const dayKey = format(day, 'yyyy-MM-dd')
             const h = highlights.find(x => x.date === dayKey)
             const today = isToday(day)
+            const isOpen = highlightOpenDay === dayKey
+            if (isMobile && !h && !isOpen) return null
             return (
-              <HighlightCell
-                key={`hl-${dayKey}`}
-                day={day}
-                dayKey={dayKey}
-                highlight={h}
-                today={today}
-                onSet={setHighlight}
-                onToggle={toggleHighlight}
-                onDelete={deleteHighlight}
-              />
+              <div key={`hl-${dayKey}`} style={isMobile ? { gridColumn: '1 / -1' } : undefined}>
+                <HighlightCell
+                  day={day}
+                  dayKey={dayKey}
+                  highlight={h}
+                  today={today}
+                  isMobile={isMobile}
+                  isOpen={isOpen}
+                  onClose={() => setHighlightOpenDay(null)}
+                  onSet={setHighlight}
+                  onToggle={toggleHighlight}
+                  onDelete={deleteHighlight}
+                />
+              </div>
             )
           })}
 
           {/* ── To-do section ── */}
           <div
-            className="flex items-start justify-end pr-1.5 pt-2"
+            className="flex items-center justify-end pr-1.5"
             style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}
           >
             <span className="text-[9px] tracking-widest font-semibold" style={{ color: 'var(--text-dim)' }}>TO-DO</span>
@@ -983,11 +1195,18 @@ export default function WeeklyBoard() {
                   background: today ? 'rgba(139, 92, 246, 0.05)' : 'var(--bg-card)',
                   borderLeft: '1px solid var(--border)',
                   borderBottom: '1px solid var(--border)',
-                  minHeight: 100,
                 }}
               >
                 {loading ? (
-                  <div className="text-center pt-5" style={{ color: 'var(--border)' }}>···</div>
+                  <div className="space-y-1.5 p-1">
+                    {[60, 80, 50].map((w, i) => (
+                      <div
+                        key={i}
+                        className="h-2.5 rounded-full animate-pulse"
+                        style={{ width: `${w}%`, background: 'var(--border)' }}
+                      />
+                    ))}
+                  </div>
                 ) : (
                   <div className="space-y-1">
                     {dayTodos.map(todo => (
@@ -1070,7 +1289,7 @@ export default function WeeklyBoard() {
                         </button>
                       </div>
                     ))}
-                    {isAdding ? (
+                    {isAdding && !isMobile ? (
                       <div className="flex items-center gap-1.5 px-1">
                         <input
                           type="text"
@@ -1107,6 +1326,13 @@ export default function WeeklyBoard() {
                         >
                           <X size={13} />
                         </button>
+                      </div>
+                    ) : isAdding && isMobile ? (
+                      <div
+                        className="flex items-center gap-1 text-[11px] mt-0.5 px-1.5 py-1 rounded-lg"
+                        style={{ color: 'var(--accent-light)', background: 'var(--accent-dim)' }}
+                      >
+                        <Plus size={12} /><span>입력 중...</span>
                       </div>
                     ) : (
                       <button
@@ -1290,12 +1516,16 @@ export default function WeeklyBoard() {
 // ── Highlight cell ──────────────────────────────────────────────────────────
 function HighlightCell({
   day, dayKey, highlight, today,
+  isMobile, isOpen, onClose,
   onSet, onToggle, onDelete,
 }: {
   day: Date
   dayKey: string
   highlight: DailyHighlight | undefined
   today: boolean
+  isMobile?: boolean
+  isOpen?: boolean
+  onClose?: () => void
   onSet: (date: string, content: string) => void
   onToggle: (h: DailyHighlight) => void
   onDelete: (date: string) => void
@@ -1304,12 +1534,28 @@ function HighlightCell({
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { if (editing) inputRef.current?.focus() }, [editing])
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  useEffect(() => {
+    if (isOpen && !highlight) {
+      setEditing(true)
+      setDraft('')
+    }
+  }, [isOpen])
 
   const submit = () => {
     if (draft.trim()) onSet(dayKey, draft.trim())
     setEditing(false)
     setDraft('')
+    onClose?.()
+  }
+
+  const cancel = () => {
+    setEditing(false)
+    setDraft('')
+    onClose?.()
   }
 
   return (
@@ -1319,7 +1565,7 @@ function HighlightCell({
         borderLeft: '1px solid var(--border)',
         borderBottom: '1px solid var(--border)',
         padding: '4px 6px',
-        minHeight: 40,
+        minHeight: isMobile ? 0 : 40,
         display: 'flex', alignItems: 'center',
       }}
       onClick={() => { if (!highlight && !editing) { setEditing(true); setDraft('') } }}
@@ -1332,9 +1578,9 @@ function HighlightCell({
           onClick={e => e.stopPropagation()}
           onKeyDown={e => {
             if (e.key === 'Enter') submit()
-            if (e.key === 'Escape') { setEditing(false); setDraft('') }
+            if (e.key === 'Escape') cancel()
           }}
-          onBlur={() => { submit() }}
+          onBlur={submit}
           placeholder="오늘의 하이라이트..."
           className="w-full text-[11px] focus:outline-none bg-transparent"
           style={{ color: 'var(--text)', borderBottom: '1px solid #ca8a04' }}
@@ -1370,9 +1616,9 @@ function HighlightCell({
             <X size={9} />
           </button>
         </div>
-      ) : (
+      ) : !isMobile ? (
         <span className="text-[10px]" style={{ color: 'rgba(202,138,4,0.35)' }}>+ 설정</span>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -1457,13 +1703,17 @@ function MatrixView({
               }}
             >
               <div style={{ padding: '10px 14px', borderBottom: `1px solid ${q.color}33`, background: `${q.color}10` }}>
-                <div className="flex items-center gap-2">
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: q.color }} />
-                  <span className="font-semibold text-[14px]" style={{ color: q.color }}>{q.label}</span>
-                  <span className="text-[11px]" style={{ color: 'var(--text-dim)' }}>{q.sub}</span>
-                  {items.length > 0 && (
-                    <span className="ml-auto text-[11px] font-bold" style={{ color: q.color }}>{items.length}</span>
-                  )}
+                <div className="flex items-start gap-2">
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: q.color, flexShrink: 0, marginTop: 3 }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-[14px]" style={{ color: q.color }}>{q.label}</span>
+                      {items.length > 0 && (
+                        <span className="ml-auto text-[11px] font-bold" style={{ color: q.color }}>{items.length}</span>
+                      )}
+                    </div>
+                    <span className="text-[11px]" style={{ color: 'var(--text-dim)' }}>{q.sub}</span>
+                  </div>
                 </div>
               </div>
               <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }} className="space-y-1.5">

@@ -158,7 +158,15 @@ export default function HabitTracker() {
       )}
 
       {loading ? (
-        <div className="text-xs text-gray-600 py-2">로딩 중...</div>
+        <div className="space-y-1.5 py-1">
+          {[75, 55, 65].map((w, i) => (
+            <div
+              key={i}
+              className="h-7 rounded-lg animate-pulse"
+              style={{ width: `${w}%`, background: 'var(--bg-card)' }}
+            />
+          ))}
+        </div>
       ) : error ? (
         <div className="text-xs text-red-400/60 py-2">{error}</div>
       ) : habits.length === 0 ? (
