@@ -27,6 +27,7 @@ export default function HabitTracker() {
   const [newHabitName, setNewHabitName] = useState('')
   const [newHabitEmoji, setNewHabitEmoji] = useState('✨')
   const [adding, setAdding] = useState(false)
+  const [createTodo, setCreateTodo] = useState(false)
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
@@ -79,6 +80,7 @@ export default function HabitTracker() {
     if (!newHabitName.trim()) return
     setAdding(true)
 
+    const shouldCreateTodo = createTodo
     try {
       const res = await fetch('/api/habits', {
         method: 'POST',
@@ -86,8 +88,16 @@ export default function HabitTracker() {
         body: JSON.stringify({ name: newHabitName.trim(), emoji: newHabitEmoji }),
       })
       if (!res.ok) throw new Error('Failed')
+      if (shouldCreateTodo) {
+        await fetch('/api/todos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: newHabitName.trim(), date: today }),
+        })
+      }
       setNewHabitName('')
       setNewHabitEmoji('✨')
+      setCreateTodo(false)
       setShowAddForm(false)
       fetchHabits()
     } catch {
@@ -131,28 +141,42 @@ export default function HabitTracker() {
       </div>
 
       {showAddForm && (
-        <form onSubmit={addHabit} className="mb-3 flex gap-2">
-          <input
-            type="text"
-            value={newHabitEmoji}
-            onChange={(e) => setNewHabitEmoji(e.target.value)}
-            className="w-10 bg-[var(--bg-input)] border border-[var(--border-dim)] rounded-lg px-2 py-1.5 text-sm text-center"
-            maxLength={2}
-          />
-          <input
-            type="text"
-            value={newHabitName}
-            onChange={(e) => setNewHabitName(e.target.value)}
-            placeholder="새 습관 이름..."
-            className="flex-1 bg-[var(--bg-input)] border border-[var(--border-dim)] rounded-lg px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
-            autoFocus
-          />
+        <form onSubmit={addHabit} className="mb-3 flex flex-col gap-1.5">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newHabitEmoji}
+              onChange={(e) => setNewHabitEmoji(e.target.value)}
+              className="w-10 bg-[var(--bg-input)] border border-[var(--border-dim)] rounded-lg px-2 py-1.5 text-sm text-center"
+              maxLength={2}
+            />
+            <input
+              type="text"
+              value={newHabitName}
+              onChange={(e) => setNewHabitName(e.target.value)}
+              placeholder="새 습관 이름..."
+              className="flex-1 bg-[var(--bg-input)] border border-[var(--border-dim)] rounded-lg px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={adding}
+              className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-xs rounded-lg transition-colors disabled:opacity-50"
+            >
+              추가
+            </button>
+          </div>
           <button
-            type="submit"
-            disabled={adding}
-            className="px-3 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-white text-xs rounded-lg transition-colors disabled:opacity-50"
+            type="button"
+            onClick={() => setCreateTodo(t => !t)}
+            className="self-start text-xs px-2 py-0.5 rounded transition-colors"
+            style={{
+              background: createTodo ? 'var(--accent-dim)' : 'var(--bg-input)',
+              color: createTodo ? 'var(--accent-light)' : 'var(--text-dim)',
+              border: `1px solid ${createTodo ? 'var(--accent)' : 'var(--border)'}`,
+            }}
           >
-            추가
+            TODO도 추가
           </button>
         </form>
       )}

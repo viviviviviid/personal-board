@@ -330,6 +330,7 @@ export default function WeeklyBoard() {
   const [entryRepeat, setEntryRepeat] = useState(false)
   const [entryFreq, setEntryFreq] = useState<RecurringFreq>('daily')
   const [entryWeekDays, setEntryWeekDays] = useState<number[]>([])
+  const [entryCreateTodo, setEntryCreateTodo] = useState(false)
   const [onboardingDone, setOnboardingDone] = useState(true) // default true — localStorage로 덮어씀
 
   useEffect(() => {
@@ -763,9 +764,11 @@ export default function WeeklyBoard() {
       endTime: newEntry.endTime || addOneHour(startTime),
       title: newEntry.title.trim(), category: newEntry.category || null,
     }
+    const shouldCreateTodo = entryCreateTodo
     setTimeline(prev => [...prev, entry])
     setNewEntry({ title: '', endTime: '', category: '' })
     setAddingEntry(null)
+    setEntryCreateTodo(false)
     try {
       const res = await fetch('/api/timeline', {
         method: 'POST',
@@ -778,6 +781,17 @@ export default function WeeklyBoard() {
       })
       const created = await res.json()
       setTimeline(prev => prev.map(e => e.id === tempId ? created : e))
+      if (shouldCreateTodo) {
+        const todoRes = await fetch('/api/todos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: entry.title, date: format(day, 'yyyy-MM-dd') }),
+        })
+        if (todoRes.ok) {
+          const todo = await todoRes.json()
+          setTodos(prev => [...prev, todo])
+        }
+      }
     } catch {
       setTimeline(prev => prev.filter(e => e.id !== tempId))
     }
@@ -1781,10 +1795,22 @@ export default function WeeklyBoard() {
                       >
                         반복
                       </button>
+                      <button
+                        type="button"
+                        onClick={e => { e.stopPropagation(); setEntryCreateTodo(r => !r) }}
+                        className="text-[10px] px-1.5 py-0.5 rounded flex-shrink-0"
+                        style={{
+                          background: entryCreateTodo ? 'var(--accent-dim)' : 'transparent',
+                          color: entryCreateTodo ? 'var(--accent-light)' : 'var(--text-dim)',
+                          border: `1px solid ${entryCreateTodo ? 'var(--accent)' : 'var(--border)'}`,
+                        }}
+                      >
+                        TODO
+                      </button>
                       <button onClick={() => submitEntry(day, addingEntry!.hour)} style={{ color: 'var(--accent)' }}>
                         <Check size={12} />
                       </button>
-                      <button onClick={() => { setAddingEntry(null); setEntryRepeat(false) }} style={{ color: 'var(--text-dim)' }}>
+                      <button onClick={() => { setAddingEntry(null); setEntryRepeat(false); setEntryCreateTodo(false) }} style={{ color: 'var(--text-dim)' }}>
                         <X size={12} />
                       </button>
                     </div>
