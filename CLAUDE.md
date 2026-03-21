@@ -34,6 +34,7 @@ if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { st
 - `enabled-calendars-monthly`: 월간 캘린더에 표시할 캘린더 ID 배열
 - `sidebar-collapsed`: 사이드바 접힘 상태 (`'true'` / `'false'`)
 - `board-month-count`: 월간 표시 개수 (`'1'` / `'2'` / `'3'`)
+- `board-mobile-cols`: 모바일 주간 보드 열 수 (`'1'` / `'2'` / `'3'`, 기본 2)
 - `pomodoro-yyyy-MM-dd`: 해당 날짜의 완료 포모도로 세션 수
 - `pb-onboarding-done`: 온보딩 배너 표시 여부 — 설정되면 더 이상 표시 안 함
 
@@ -69,3 +70,23 @@ if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { st
 - `src/components/PomodoroTimer.tsx` — 독립 컴포넌트, DB 없이 localStorage만 사용
 - 집중 25분 → 휴식 5분 자동 전환, 브라우저 Notification API 사용
 - 세션 카운터 키: `pomodoro-yyyy-MM-dd`
+
+### 반복 일정 (Recurring)
+- `RecurringRule` 모델이 Todo/TimelineEntry 공용 템플릿, `type`: `'todo'` | `'timeline'`
+- 생성 시 365일치 인스턴스를 `createMany` bulk insert (`src/lib/recurring.ts`)
+- 주파수: `daily` / `weekdays` / `weekly`(요일별 복수 선택) / `monthly`
+- `weekDays`: ISO 요일 배열 `[1,3]` (1=월…7=일), `monthly`는 `monthDay: number`
+- 삭제: `recurringRuleId` 있으면 `RecurringRule` 삭제 → cascade로 모든 인스턴스 자동 삭제
+- `prisma migrate dev`가 shadow DB 권한 부족 시 `prisma db push` 사용
+- UI: `RepeatPicker` 컴포넌트 (WeeklyBoard.tsx 내 정의), 반복 항목은 🔁 인디케이터 표시
+
+### TODO 동반 생성
+- 타임라인 폼: "TODO" 토글 → 타임라인 생성과 동시에 동일 제목+날짜 투두 생성
+- 습관 폼: "TODO도 추가" 토글 → 습관 생성과 동시에 오늘 날짜 투두 생성
+- 반복 타임라인 + TODO 동시 생성 시 동일한 `freq`/`weekDays`/`monthDay`로 반복 투두도 함께 생성
+
+### 테스트
+- Jest + ts-jest, 테스트 파일: `src/__tests__/lib/`
+- `npx jest` / `npm test`
+- 커버 범위: `recurring.ts` (generateDates, createRecurringTodos, createRecurringTimelineEntries), `habitUtils.ts`, `timeUtils.ts`
+- Prisma는 `jest.fn()` mock 사용 (실제 DB 연결 불필요)
