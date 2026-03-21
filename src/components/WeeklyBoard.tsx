@@ -5,7 +5,7 @@ import { useSwipe } from '@/hooks/useSwipe'
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink, AlertCircle } from 'lucide-react'
 import { signIn } from 'next-auth/react'
-import AIFeedback from './AIFeedback'
+import AIPanel from './AIPanel'
 import MonthlyCalendar from './MonthlyCalendar'
 import PomodoroTimer from './PomodoroTimer'
 import {
@@ -1048,7 +1048,14 @@ export default function WeeklyBoard() {
             >
               <ChevronRight size={isMobile ? 18 : 15} />
             </button>
-            {!isMobile && view === 'weekly' && <AIFeedback weekStart={currentWeekStart} />}
+            {!isMobile && view === 'weekly' && (
+              <AIPanel
+                weekStart={currentWeekStart}
+                today={new Date()}
+                modes={['weekly', 'daily']}
+                defaultMode="weekly"
+              />
+            )}
             {view === 'weekly' && isMobile && (
               <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
                 {[1, 2, 3].map((n, i, arr) => (

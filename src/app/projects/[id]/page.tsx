@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ChevronLeft, ChevronDown, ChevronRight, Plus, Check, X, Target, Trash2, Pencil, Calendar } from 'lucide-react'
+import AIPanel from '@/components/AIPanel'
 
 interface Todo {
   id: string
@@ -560,6 +561,12 @@ export default function ProjectDetailPage() {
         >
           <ChevronLeft size={16} />프로젝트 목록
         </Link>
+        <AIPanel
+          projectId={project.id}
+          projectName={project.name}
+          modes={['project']}
+          defaultMode="project"
+        />
         <button
           onClick={() => setConfirmDelete(true)}
           className="p-1.5 rounded-lg transition-all"
