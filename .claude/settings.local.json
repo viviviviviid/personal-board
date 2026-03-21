@@ -39,7 +39,9 @@
       "Bash(head -20 grep -n \"loading\\\\|skeleton\\\\|Skeleton\\\\|···\\\\|로딩\" /Users/viviviviviid/Desktop/project/tool/calender-todo/src/components/MonthlyCalendar.tsx)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(curl -s http://localhost:3000/manifest.webmanifest)"
+      "Bash(curl -s http://localhost:3000/manifest.webmanifest)",
+      "Bash(python3:*)",
+      "Bash(grep:*)"
     ]
   }
 }
