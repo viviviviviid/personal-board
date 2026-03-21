@@ -128,7 +128,7 @@ type RecurringFreq = 'daily' | 'weekdays' | 'weekly' | 'monthly'
 const FREQ_LABELS: { val: RecurringFreq; label: string }[] = [
   { val: 'daily', label: '매일' },
   { val: 'weekdays', label: '평일' },
-  { val: 'weekly', label: '매주' },
+  { val: 'weekly', label: '요일별' },
   { val: 'monthly', label: '매달' },
 ]
 
