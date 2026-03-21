@@ -222,7 +222,7 @@ export default function WeeklyBoard() {
   )
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
   const [monthCount, setMonthCount] = useState<1 | 2 | 3>(1)
-  const [todoRows, setTodoRows] = useState(2)
+  const [mobileDayCols, setMobileDayCols] = useState(2)
   const [todos, setTodos] = useState<Todo[]>([])
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([])
@@ -359,15 +359,15 @@ export default function WeeklyBoard() {
     localStorage.setItem('board-month-count', String(n))
   }
 
-  // Persist todoRows
+  // Persist mobileDayCols
   useEffect(() => {
-    const saved = localStorage.getItem('board-todo-rows')
-    if (saved && Number(saved) >= 1) setTodoRows(Number(saved))
+    const saved = localStorage.getItem('board-mobile-cols')
+    if (saved && Number(saved) >= 1) setMobileDayCols(Number(saved))
   }, [])
 
-  const setTodoRowsPersist = (n: number) => {
-    setTodoRows(n)
-    localStorage.setItem('board-todo-rows', String(n))
+  const setMobileDayColsPersist = (n: number) => {
+    setMobileDayCols(n)
+    localStorage.setItem('board-mobile-cols', String(n))
   }
 
   // Current time
@@ -727,7 +727,7 @@ export default function WeeklyBoard() {
     : `${format(currentMonth, 'yyyy.MM')} — ${format(addMonths(currentMonth, monthCount - 1), 'yyyy.MM')}`
   const nowY = nowToY(now)
   const gridCols = `44px repeat(7, minmax(0, 1fr))`
-  const visibleDays = isMobile ? weekDays.slice(mobileDay, Math.min(mobileDay + 3, 7)) : weekDays
+  const visibleDays = isMobile ? weekDays.slice(mobileDay, Math.min(mobileDay + mobileDayCols, 7)) : weekDays
   const mobileCols = `44px repeat(${visibleDays.length}, minmax(0, 1fr))`
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -901,14 +901,14 @@ export default function WeeklyBoard() {
             {!isMobile && view === 'weekly' && <AIFeedback weekStart={currentWeekStart} />}
             {view === 'weekly' && isMobile && (
               <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-                {[1, 2, 3, 5].map((n, i, arr) => (
+                {[1, 2, 3].map((n, i, arr) => (
                   <button
                     key={n}
-                    onClick={() => setTodoRowsPersist(n)}
+                    onClick={() => setMobileDayColsPersist(n)}
                     className="px-2 py-1 text-xs transition-all"
                     style={{
-                      background: todoRows === n ? 'var(--accent-dim)' : 'var(--bg-card)',
-                      color: todoRows === n ? 'var(--accent-light)' : 'var(--text-muted)',
+                      background: mobileDayCols === n ? 'var(--accent-dim)' : 'var(--bg-card)',
+                      color: mobileDayCols === n ? 'var(--accent-light)' : 'var(--text-muted)',
                       borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
                     }}
                   >
@@ -1005,7 +1005,7 @@ export default function WeeklyBoard() {
         <div className="flex gap-1 mb-3 overflow-x-auto flex-shrink-0">
           {weekDays.map((day, i) => {
             const today = isToday(day)
-            const isSelected = i >= mobileDay && i < mobileDay + 3
+            const isSelected = i >= mobileDay && i < mobileDay + mobileDayCols
             return (
               <button
                 key={i}
@@ -1299,7 +1299,7 @@ export default function WeeklyBoard() {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {dayTodos.slice(0, isMobile ? todoRows : undefined).map(todo => (
+                    {dayTodos.map(todo => (
                       <div
                         key={todo.id}
                         className="flex items-center gap-1.5 group px-1.5 py-1.5 rounded-lg transition-colors"
@@ -1379,14 +1379,6 @@ export default function WeeklyBoard() {
                         </button>
                       </div>
                     ))}
-                    {isMobile && dayTodos.length > todoRows && (
-                      <div
-                        className="px-1.5 py-0.5 text-[11px] rounded cursor-default"
-                        style={{ color: 'var(--text-dim)' }}
-                      >
-                        +{dayTodos.length - todoRows}개 더
-                      </div>
-                    )}
                     {isAdding && !isMobile ? (
                       <div className="flex items-center gap-1.5 px-1">
                         <input
