@@ -229,6 +229,79 @@ describe('createRecurringTodos', () => {
   })
 })
 
+// ── UTC 날짜 정확성 (timezone 버그 방지) ──────────────────────────────────────
+// 버그 재현: setHours(0,0,0,0)는 로컬 자정 기준 → UTC+9에서 전날 15:00Z로 저장됨
+// 수정: setUTCHours(0,0,0,0)으로 UTC 자정 보장
+
+describe('generateDates - UTC 날짜 정확성', () => {
+  // 2026-03-23 (월요일 UTC)
+  const MONDAY_UTC = new Date('2026-03-23T00:00:00.000Z')
+  // 2026-03-25 (수요일 UTC)
+  const WEDNESDAY_UTC = new Date('2026-03-25T00:00:00.000Z')
+
+  test('반환된 날짜의 UTC 시간이 자정(00:00:00Z)', () => {
+    const end = new Date('2026-03-29T00:00:00.000Z')
+    const dates = generateDates('weekly', [1, 3], undefined, MONDAY_UTC, end)
+    dates.forEach(d => {
+      expect(d.getUTCHours()).toBe(0)
+      expect(d.getUTCMinutes()).toBe(0)
+      expect(d.getUTCSeconds()).toBe(0)
+    })
+  })
+
+  test('월(1) 선택 시 첫 번째 날짜의 UTC 날짜 문자열이 실제 월요일', () => {
+    const end = new Date('2026-03-29T00:00:00.000Z')
+    const dates = generateDates('weekly', [1], undefined, MONDAY_UTC, end)
+    expect(dates[0].toISOString().slice(0, 10)).toBe('2026-03-23') // 월요일
+  })
+
+  test('수(3) 선택 시 UTC 날짜 문자열이 실제 수요일', () => {
+    const end = new Date('2026-03-29T00:00:00.000Z')
+    const dates = generateDates('weekly', [3], undefined, MONDAY_UTC, end)
+    expect(dates[0].toISOString().slice(0, 10)).toBe('2026-03-25') // 수요일
+  })
+
+  test('월(1)+수(3) 선택 시 반환 날짜 순서가 월 → 수', () => {
+    const end = new Date('2026-03-29T00:00:00.000Z')
+    const dates = generateDates('weekly', [1, 3], undefined, MONDAY_UTC, end)
+    expect(dates).toHaveLength(2)
+    expect(dates[0].toISOString().slice(0, 10)).toBe('2026-03-23') // 월
+    expect(dates[1].toISOString().slice(0, 10)).toBe('2026-03-25') // 수
+  })
+
+  test('4주치 월(1) 날짜가 모두 실제 월요일 (UTC 기준)', () => {
+    const end = new Date('2026-04-19T00:00:00.000Z')
+    const dates = generateDates('weekly', [1], undefined, MONDAY_UTC, end)
+    const expectedMondays = [
+      '2026-03-23', '2026-03-30', '2026-04-06', '2026-04-13',
+    ]
+    expect(dates.map(d => d.toISOString().slice(0, 10))).toEqual(expectedMondays)
+  })
+
+  test('daily 반복 시 모든 날짜가 UTC 자정', () => {
+    const end = new Date('2026-03-25T00:00:00.000Z')
+    const dates = generateDates('daily', [], undefined, MONDAY_UTC, end)
+    dates.forEach(d => {
+      expect(d.toISOString()).toMatch(/T00:00:00\.000Z$/)
+    })
+  })
+
+  test('수요일 시작 시 수(3)만 선택하면 당일 포함', () => {
+    const dates = generateDates('weekly', [3], undefined, WEDNESDAY_UTC, WEDNESDAY_UTC)
+    expect(dates).toHaveLength(1)
+    expect(dates[0].toISOString().slice(0, 10)).toBe('2026-03-25')
+  })
+
+  test('getISODay로 검증한 요일이 UTC 날짜 요일과 일치', () => {
+    const end = new Date('2026-04-05T00:00:00.000Z')
+    const dates = generateDates('weekly', [1, 3], undefined, MONDAY_UTC, end)
+    dates.forEach(d => {
+      const utcDay = d.getUTCDay() // 0=일, 1=월, ..., 3=수
+      expect([1, 3]).toContain(utcDay) // 월(1) 또는 수(3)
+    })
+  })
+})
+
 // ── createRecurringTimelineEntries ────────────────────────────────────────────
 
 describe('createRecurringTimelineEntries', () => {

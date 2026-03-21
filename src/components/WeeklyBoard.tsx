@@ -192,15 +192,17 @@ interface EntryBlockProps {
   entry: TimelineEntry
   onDelete: () => void
   onDragStart: (e: React.MouseEvent, type: 'move' | 'resize') => void
+  onSelect: (entry: TimelineEntry, rect: DOMRect) => void
   layoutCol?: number
   layoutTotal?: number
 }
 
-function EntryBlock({ entry, onDelete, onDragStart, layoutCol = 0, layoutTotal = 1 }: EntryBlockProps) {
+function EntryBlock({ entry, onDelete, onDragStart, onSelect, layoutCol = 0, layoutTotal = 1 }: EntryBlockProps) {
   const top = timeToY(entry.startTime)
   const effEnd = entry.endTime || addOneHour(entry.startTime)
   const height = Math.max(20, timeToY(effEnd) - top)
   const s = CAT_STYLE[entry.category || ''] ?? DEF_STYLE
+  const didDragRef = useRef(false)
 
   const GAP = 2
   const pct = 100 / layoutTotal
@@ -215,7 +217,17 @@ function EntryBlock({ entry, onDelete, onDragStart, layoutCol = 0, layoutTotal =
         borderRadius: 6,
       }}
       className="text-[10px] overflow-hidden group select-none"
-      onMouseDown={e => { e.stopPropagation(); onDragStart(e, 'move') }}
+      onMouseDown={e => {
+        e.stopPropagation()
+        didDragRef.current = false
+        onDragStart(e, 'move')
+      }}
+      onClick={e => {
+        e.stopPropagation()
+        if (didDragRef.current) return
+        const rect = e.currentTarget.getBoundingClientRect()
+        onSelect(entry, rect)
+      }}
     >
       <div className="px-1.5 pt-0.5 pb-4 h-full overflow-hidden cursor-grab active:cursor-grabbing">
         <div className="font-mono text-[9px] opacity-55 tabular-nums leading-none">
@@ -226,24 +238,238 @@ function EntryBlock({ entry, onDelete, onDragStart, layoutCol = 0, layoutTotal =
           {entry.title}
         </div>
       </div>
-      {/* delete */}
-      <button
-        style={{ position: 'absolute', top: 3, right: 3 }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity"
-        onMouseDown={e => e.stopPropagation()}
-        onClick={e => { e.stopPropagation(); onDelete() }}
-      >
-        <X size={9} />
-      </button>
       {/* resize handle */}
       <div
         style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 10, cursor: 'ns-resize' }}
         className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-        onMouseDown={e => { e.stopPropagation(); onDragStart(e, 'resize') }}
+        onMouseDown={e => { e.stopPropagation(); didDragRef.current = true; onDragStart(e, 'resize') }}
       >
         <div className="w-8 h-[2px] rounded-full bg-current opacity-40" />
       </div>
     </div>
+  )
+}
+
+// ── Entry detail popover ────────────────────────────────────────────────────
+const CAT_LABEL: Record<string, string> = {
+  work: '업무', personal: '개인', exercise: '운동', study: '학습', health: '건강', other: '기타',
+}
+
+interface EntryDetailPopoverProps {
+  entry: TimelineEntry
+  anchorRect: DOMRect
+  onClose: () => void
+  onUpdated: (updated: TimelineEntry) => void
+  onDeleted: (id: string, mode: 'single' | 'future' | 'all') => void
+}
+
+function EntryDetailPopover({ entry, anchorRect, onClose, onUpdated, onDeleted }: EntryDetailPopoverProps) {
+  const [editing, setEditing] = useState(false)
+  const [title, setTitle] = useState(entry.title)
+  const [startTime, setStartTime] = useState(entry.startTime)
+  const [endTime, setEndTime] = useState(entry.endTime ?? '')
+  const [category, setCategory] = useState(entry.category ?? '')
+  const [saving, setSaving] = useState(false)
+  const [recurringAction, setRecurringAction] = useState<'edit' | 'delete' | null>(null)
+
+  // 팝오버 위치: 오른쪽 공간 부족하면 왼쪽
+  const popWidth = 220
+  const left = anchorRect.right + 8 + popWidth > window.innerWidth
+    ? anchorRect.left - popWidth - 8
+    : anchorRect.right + 8
+  const top = Math.min(anchorRect.top, window.innerHeight - 320)
+
+  const handleSave = async (mode: 'single' | 'all') => {
+    setSaving(true)
+    const res = await fetch(`/api/timeline/${entry.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, startTime, endTime: endTime || null, category: category || null, mode }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      onUpdated({ ...entry, title, startTime, endTime: endTime || null, category: category || null, ...(updated.success ? {} : updated) })
+      setEditing(false)
+      setRecurringAction(null)
+      if (mode === 'all') onClose()
+    }
+    setSaving(false)
+  }
+
+  const handleDelete = async (mode: 'single' | 'future' | 'all') => {
+    await fetch(`/api/timeline/${entry.id}?mode=${mode}`, { method: 'DELETE' })
+    onDeleted(entry.id, mode)
+    onClose()
+  }
+
+  return (
+    <>
+      {/* backdrop */}
+      <div className="fixed inset-0 z-[9998]" onClick={onClose} />
+
+      {/* popover */}
+      <div
+        style={{
+          position: 'fixed', top, left, width: popWidth, zIndex: 9999,
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border)',
+          borderRadius: 12,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* 색상 바 */}
+        <div style={{ height: 3, borderRadius: '12px 12px 0 0', background: CAT_STYLE[entry.category || '']?.border ?? 'var(--accent)' }} />
+
+        <div className="p-3">
+          {/* 헤더 */}
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <div className="flex-1 min-w-0">
+              {editing ? (
+                <input
+                  autoFocus
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  onKeyDown={e => { if (e.nativeEvent.isComposing) return; if (e.key === 'Escape') { setEditing(false); setRecurringAction(null) } }}
+                  className="w-full text-sm font-semibold bg-transparent border-b focus:outline-none"
+                  style={{ borderColor: 'var(--accent)', color: 'var(--text-bright)' }}
+                />
+              ) : (
+                <div className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-bright)' }}>
+                  {entry.recurringRuleId && <span className="text-[10px] mr-1 opacity-50">🔁</span>}
+                  {entry.title}
+                </div>
+              )}
+            </div>
+            <button onClick={onClose} style={{ color: 'var(--text-dim)', flexShrink: 0 }}>
+              <X size={14} />
+            </button>
+          </div>
+
+          {/* 시간 / 카테고리 */}
+          {editing ? (
+            <div className="space-y-1.5 mb-3">
+              <div className="flex gap-1 items-center">
+                <input
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  placeholder="시작"
+                  className="w-16 text-[11px] rounded px-1.5 py-0.5 focus:outline-none"
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                />
+                <span className="text-[10px]" style={{ color: 'var(--text-dim)' }}>~</span>
+                <input
+                  value={endTime}
+                  onChange={e => setEndTime(e.target.value)}
+                  placeholder="종료"
+                  className="w-16 text-[11px] rounded px-1.5 py-0.5 focus:outline-none"
+                  style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                />
+              </div>
+              <select
+                value={category}
+                onChange={e => setCategory(e.target.value)}
+                className="w-full text-[11px] rounded px-1.5 py-0.5 focus:outline-none"
+                style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                <option value="">카테고리 없음</option>
+                <option value="work">업무</option>
+                <option value="personal">개인</option>
+                <option value="exercise">운동</option>
+                <option value="study">학습</option>
+                <option value="health">건강</option>
+                <option value="other">기타</option>
+              </select>
+            </div>
+          ) : (
+            <div className="mb-3 space-y-1">
+              <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {entry.startTime}{entry.endTime ? ` – ${entry.endTime}` : ''}
+              </div>
+              {entry.category && (
+                <div className="text-xs" style={{ color: 'var(--text-dim)' }}>
+                  {CAT_LABEL[entry.category] ?? entry.category}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 반복 옵션 다이얼로그 */}
+          {recurringAction && (
+            <div className="mb-3 rounded-lg p-2.5 space-y-1.5" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-dim)' }}>
+              <div className="text-[10px] font-medium mb-2" style={{ color: 'var(--text-muted)' }}>
+                {recurringAction === 'delete' ? '어떤 일정을 삭제할까요?' : '어떤 일정을 수정할까요?'}
+              </div>
+              {(['single', 'future', 'all'] as const)
+                .filter(m => recurringAction === 'edit' ? m !== 'future' : true)
+                .map(m => (
+                  <button
+                    key={m}
+                    onClick={() => recurringAction === 'delete' ? handleDelete(m) : handleSave(m as 'single' | 'all')}
+                    disabled={saving}
+                    className="w-full text-left text-[11px] px-2 py-1.5 rounded transition-colors"
+                    style={{ color: 'var(--text)', background: 'transparent' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    {m === 'single' ? '이 일정만' : m === 'future' ? '이 일정 및 이후 일정' : '모든 일정'}
+                  </button>
+                ))
+              }
+              <button
+                onClick={() => setRecurringAction(null)}
+                className="w-full text-left text-[11px] px-2 py-1 rounded"
+                style={{ color: 'var(--text-dim)' }}
+              >
+                취소
+              </button>
+            </div>
+          )}
+
+          {/* 액션 버튼 */}
+          {!recurringAction && (
+            <div className="flex gap-1.5 justify-end">
+              {editing ? (
+                <>
+                  <button
+                    onClick={() => { setEditing(false); setTitle(entry.title); setStartTime(entry.startTime); setEndTime(entry.endTime ?? ''); setCategory(entry.category ?? '') }}
+                    className="text-[11px] px-2.5 py-1 rounded-lg"
+                    style={{ color: 'var(--text-dim)', border: '1px solid var(--border)' }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    onClick={() => entry.recurringRuleId ? setRecurringAction('edit') : handleSave('single')}
+                    disabled={saving}
+                    className="text-[11px] px-2.5 py-1 rounded-lg"
+                    style={{ background: 'var(--accent)', color: '#fff' }}
+                  >
+                    {saving ? '저장 중…' : '저장'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => entry.recurringRuleId ? setRecurringAction('delete') : handleDelete('single')}
+                    className="text-[11px] px-2.5 py-1 rounded-lg"
+                    style={{ color: 'var(--danger)', border: '1px solid rgba(239,68,68,0.3)' }}
+                  >
+                    삭제
+                  </button>
+                  <button
+                    onClick={() => setEditing(true)}
+                    className="text-[11px] px-2.5 py-1 rounded-lg"
+                    style={{ background: 'var(--accent-dim)', color: 'var(--accent-light)', border: '1px solid var(--accent)' }}
+                  >
+                    수정
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   )
 }
 
@@ -320,6 +546,7 @@ export default function WeeklyBoard() {
   const [addingTodoDay, setAddingTodoDay] = useState<string | null>(null)
   const [highlightOpenDay, setHighlightOpenDay] = useState<string | null>(null)
   const [newTodoTitle, setNewTodoTitle] = useState('')
+  const [selectedEntry, setSelectedEntry] = useState<{ entry: TimelineEntry; rect: DOMRect } | null>(null)
   const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number; startTime?: string } | null>(null)
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
   const [creationDrag, setCreationDrag] = useState<{ dateKey: string; topY: number; bottomY: number } | null>(null)
@@ -885,6 +1112,33 @@ export default function WeeklyBoard() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }} {...swipeHandlers}>
+
+      {/* Entry detail popover */}
+      {selectedEntry && (
+        <EntryDetailPopover
+          entry={selectedEntry.entry}
+          anchorRect={selectedEntry.rect}
+          onClose={() => setSelectedEntry(null)}
+          onUpdated={updated => {
+            setTimeline(prev => prev.map(t => t.id === updated.id ? updated : t))
+            setSelectedEntry(null)
+          }}
+          onDeleted={(id, mode) => {
+            if (mode === 'all') {
+              const ruleId = selectedEntry.entry.recurringRuleId
+              setTimeline(prev => prev.filter(t => ruleId ? t.recurringRuleId !== ruleId : t.id !== id))
+            } else if (mode === 'future') {
+              const ruleId = selectedEntry.entry.recurringRuleId
+              const entryDate = new Date(selectedEntry.entry.date)
+              setTimeline(prev => prev.filter(t =>
+                t.recurringRuleId !== ruleId || new Date(t.date) < entryDate
+              ))
+            } else {
+              setTimeline(prev => prev.filter(t => t.id !== id))
+            }
+          }}
+        />
+      )}
 
       {/* Header — 2-row layout */}
       <div className="flex flex-col gap-2 mb-3 flex-shrink-0">
@@ -1780,6 +2034,7 @@ export default function WeeklyBoard() {
                       entry={entry}
                       onDelete={() => deleteEntry(entry.id)}
                       onDragStart={(e, type) => handleDragStart(e, entry, type)}
+                      onSelect={(e, rect) => setSelectedEntry({ entry: e, rect })}
                       layoutCol={lv?.col}
                       layoutTotal={lv?.total}
                     />

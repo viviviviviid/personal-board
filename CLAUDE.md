@@ -76,7 +76,8 @@ if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { st
 - 생성 시 365일치 인스턴스를 `createMany` bulk insert (`src/lib/recurring.ts`)
 - 주파수: `daily` / `weekdays` / `weekly`(요일별 복수 선택) / `monthly`
 - `weekDays`: ISO 요일 배열 `[1,3]` (1=월…7=일), `monthly`는 `monthDay: number`
-- 삭제: `recurringRuleId` 있으면 `RecurringRule` 삭제 → cascade로 모든 인스턴스 자동 삭제
+- **날짜 생성 시 반드시 `setUTCHours(0,0,0,0)` 사용** — `setHours`는 로컬 자정 기준으로 UTC+9에서 전날 날짜로 저장되는 버그 발생
+- 삭제 3가지 모드: `single`(해당 인스턴스만) / `future`(이날 이후 인스턴스) / `all`(RecurringRule 삭제 → cascade)
 - `prisma migrate dev`가 shadow DB 권한 부족 시 `prisma db push` 사용
 - UI: `RepeatPicker` 컴포넌트 (WeeklyBoard.tsx 내 정의), 반복 항목은 🔁 인디케이터 표시
 
@@ -85,8 +86,31 @@ if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { st
 - 습관 폼: "TODO도 추가" 토글 → 습관 생성과 동시에 오늘 날짜 투두 생성
 - 반복 타임라인 + TODO 동시 생성 시 동일한 `freq`/`weekDays`/`monthDay`로 반복 투두도 함께 생성
 
+### 타임라인 항목 상세/수정/삭제
+- 항목 클릭 → `EntryDetailPopover` (fixed 포지션, 항목 우측 or 좌측 플립)
+- 수정: 인라인 편집 (제목/시간/카테고리), 저장 시 반복 항목이면 `single`/`all` 선택
+- 삭제: 반복 항목이면 `single`/`future`/`all` 3가지 옵션 다이얼로그
+- API: `DELETE /api/timeline/[id]?mode=single|future|all`, `PATCH` body에 `mode: 'single'|'all'`
+
+### 타임라인 생성 UX
+- 빈 공간 **드래그** → 보라색 미리보기 블록 + 시간 레이블 표시, mouseup 시 선택 범위로 폼 열림
+- 빈 공간 **클릭** → 해당 시간에 폼 열림 (기존 동작 유지)
+- 생성 중 블록: 내부 드래그로 시간 이동, 하단 핸들 드래그로 종료 시간 조정
+- 폼 필드(제목/카테고리/반복/TODO)는 블록 우측 **fixed 포지션 툴팁**으로 분리
+
+### AI 어시스턴트 (AIPanel)
+- `src/components/AIPanel.tsx` — 3가지 모드를 탭으로 통합
+- **주간 회고** (`/api/ai/feedback`): 우선순위별 완료율, 아이젠하워 분포, 타임라인 카테고리별 시간, 습관 streak, 데일리 하이라이트 포함
+- **일일 브리핑** (`/api/ai/daily-brief`): 오늘 할일/일정/미완료 습관 → TOP3 + 시간 활용 제안
+- **프로젝트 진단** (`/api/ai/project`): goal 대비 섹션별 진행률 + 블로커 + 다음 액션
+- WeeklyBoard에서 주간회고/일일브리핑 2탭, 프로젝트 상세에서 진단 단독 표시
+- AI 모델: Google Gemini, `GEMINI_API_KEY` / `GEMINI_MODEL` 환경변수로 설정
+
 ### 테스트
 - Jest + ts-jest, 테스트 파일: `src/__tests__/lib/`
 - `npx jest` / `npm test`
-- 커버 범위: `recurring.ts` (generateDates, createRecurringTodos, createRecurringTimelineEntries), `habitUtils.ts`, `timeUtils.ts`
+- 커버 범위:
+  - `recurring.ts`: generateDates (UTC 날짜 정확성 포함), createRecurringTodos, createRecurringTimelineEntries
+  - `timelineDelete.test.ts`: single/future/all 삭제 모드 비즈니스 로직
+  - `habitUtils.ts`, `timeUtils.ts`
 - Prisma는 `jest.fn()` mock 사용 (실제 DB 연결 불필요)

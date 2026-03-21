@@ -14,9 +14,9 @@ export function generateDates(
 ): Date[] {
   const result: Date[] = []
   let current = new Date(startDate)
-  current.setHours(0, 0, 0, 0)
+  current.setUTCHours(0, 0, 0, 0)
   const end = new Date(endDate)
-  end.setHours(23, 59, 59, 999)
+  end.setUTCHours(23, 59, 59, 999)
 
   while (current <= end) {
     const isoDay = getISODay(current) // 1=월...7=일

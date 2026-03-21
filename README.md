@@ -6,7 +6,9 @@
 
 - **Google 로그인** — OAuth 2.0, 유저별 데이터 완전 격리
 - **주간 보드** — 요일별 투두 + 타임라인(드래그/리사이즈), 현재 시간 표시, 좌우 화살표 키로 주 이동, 모바일 N열 보기(1/2/3 선택)
-- **반복 일정** — 투두·타임라인 모두 매일/평일/요일별/매달 반복 설정 가능, 365일치 사전 생성, 시리즈 단위 삭제, `🔁` 인디케이터 표시
+- **타임라인 생성** — 드래그로 시간 범위 선택, 생성 중 블록 이동·리사이즈, 항목 클릭 시 상세 팝오버(수정/삭제)
+- **반복 일정** — 투두·타임라인 모두 매일/평일/요일별/매달 반복 설정 가능, 365일치 사전 생성, `🔁` 인디케이터 표시
+- **반복 삭제 3가지 옵션** — 이 일정만 / 이 일정 및 이후 / 모든 일정 선택 삭제
 - **TODO 동반 생성** — 타임라인 항목·습관 추가 시 "TODO도 추가" 토글로 동일 일정의 투두 자동 생성 (반복 설정 연동)
 - **데일리 하이라이트** — 날짜별 오늘의 핵심 목표 1개 설정 (Make Time 방법론)
 - **아이젠하워 매트릭스** — 긴급/중요 2축으로 할일 4분면 분류 뷰 (주간 | 월간 | 매트릭스)
@@ -16,7 +18,7 @@
 - **습관 트래커** — 일별 체크인, 스트릭 표시, 습관 추가 시 오늘 날짜 투두 동반 생성 옵션
 - **프로젝트** — 섹션별 투두, 인라인 제목 편집, 기한 날짜 설정
 - **사이드바** — 접기/펼치기, localStorage 유지
-- **AI 피드백** — Claude API 기반 주간 회고
+- **AI 어시스턴트** — Google Gemini 기반 3가지 모드: 주간 회고(우선순위/아이젠하워/시간분배 분석), 일일 브리핑(오늘 TOP3 + 시간 활용 제안), 프로젝트 진단(goal 대비 진행률 분석)
 - **온보딩** — 첫 로그인 시 사용법 안내 배너 (1회 표시)
 - **모바일 최적화** — 소프트 키보드 레이아웃 밀림 방지 (고정 바텀 시트 입력)
 
@@ -43,6 +45,8 @@ GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 AUTH_SECRET=...
 NEXTAUTH_URL=http://localhost:3000
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-2.0-flash
 ```
 
 ### Google Cloud Console 설정
@@ -66,26 +70,33 @@ npm run dev
 
 ```
 src/
-├── __tests__/lib/                # Jest 단위 테스트 (recurring, habitUtils, timeUtils)
+├── __tests__/lib/                # Jest 단위 테스트
+│   ├── recurring.test.ts         # generateDates (UTC 정확성 포함), createMany
+│   ├── timelineDelete.test.ts    # single/future/all 삭제 모드 로직
+│   ├── timeUtils.test.ts
+│   └── habitUtils.test.ts
 ├── app/
 │   ├── api/
 │   │   ├── auth/[...nextauth]/   # NextAuth 핸들러
 │   │   ├── google-calendar/      # Google Calendar 이벤트 + 목록
 │   │   ├── todos/
-│   │   ├── timeline/
+│   │   ├── timeline/             # CRUD + mode=single|future|all 삭제/수정
 │   │   ├── habits/
-│   │   └── projects/
+│   │   ├── projects/
+│   │   ├── daily-highlight/      # 데일리 하이라이트 CRUD
+│   │   └── ai/
+│   │       ├── feedback/         # 주간 회고 (Gemini)
+│   │       ├── daily-brief/      # 일일 브리핑 (Gemini)
+│   │       └── project/          # 프로젝트 진단 (Gemini)
 │   ├── login/                    # Google 로그인 페이지
 │   └── projects/[id]/            # 프로젝트 상세
 ├── components/
 │   ├── WeeklyBoard.tsx           # 주간/월간/매트릭스 뷰 메인 컴포넌트
 │   ├── MonthlyCalendar.tsx       # 월간 캘린더
 │   ├── PomodoroTimer.tsx         # 포모도로 타이머 위젯
+│   ├── AIPanel.tsx               # AI 어시스턴트 (주간회고/일일브리핑/프로젝트진단 탭)
 │   ├── Sidebar.tsx               # 사이드바 (접기/펼치기, 로그아웃)
-│   ├── HabitTracker.tsx
-│   └── AIFeedback.tsx
-├── context/
-│   └── SidebarContext.tsx
+│   └── HabitTracker.tsx
 ├── lib/
 │   ├── auth.ts                   # NextAuth v5 설정
 │   ├── google-token.ts           # access_token 갱신 로직
@@ -93,7 +104,6 @@ src/
 │   ├── recurring.ts              # 반복 일정 날짜 생성 + bulk insert 유틸
 │   ├── timeUtils.ts              # 타임라인 Y좌표 계산 유틸
 │   └── habitUtils.ts             # 스트릭·주간이력 계산 유틸
-├── app/api/daily-highlight/      # 데일리 하이라이트 CRUD
 └── proxy.ts                      # 인증 미들웨어 (middleware.ts 대체)
 ```
 
