@@ -222,6 +222,7 @@ export default function WeeklyBoard() {
   )
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
   const [monthCount, setMonthCount] = useState<1 | 2 | 3>(1)
+  const [todoRows, setTodoRows] = useState(2)
   const [todos, setTodos] = useState<Todo[]>([])
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([])
@@ -356,6 +357,17 @@ export default function WeeklyBoard() {
   const setMonthCountPersist = (n: 1 | 2 | 3) => {
     setMonthCount(n)
     localStorage.setItem('board-month-count', String(n))
+  }
+
+  // Persist todoRows
+  useEffect(() => {
+    const saved = localStorage.getItem('board-todo-rows')
+    if (saved && Number(saved) >= 1) setTodoRows(Number(saved))
+  }, [])
+
+  const setTodoRowsPersist = (n: number) => {
+    setTodoRows(n)
+    localStorage.setItem('board-todo-rows', String(n))
   }
 
   // Current time
@@ -887,6 +899,24 @@ export default function WeeklyBoard() {
               <ChevronRight size={isMobile ? 18 : 15} />
             </button>
             {!isMobile && view === 'weekly' && <AIFeedback weekStart={currentWeekStart} />}
+            {view === 'weekly' && (
+              <div className="flex rounded-lg overflow-hidden ml-auto" style={{ border: '1px solid var(--border)' }}>
+                {[1, 2, 3, 5].map((n, i, arr) => (
+                  <button
+                    key={n}
+                    onClick={() => setTodoRowsPersist(n)}
+                    className="px-2 py-1 text-xs transition-all"
+                    style={{
+                      background: todoRows === n ? 'var(--accent-dim)' : 'var(--bg-card)',
+                      color: todoRows === n ? 'var(--accent-light)' : 'var(--text-muted)',
+                      borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
+                    }}
+                  >
+                    {n}줄
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {view === 'monthly' && (
@@ -1269,7 +1299,7 @@ export default function WeeklyBoard() {
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    {dayTodos.map(todo => (
+                    {dayTodos.slice(0, todoRows).map(todo => (
                       <div
                         key={todo.id}
                         className="flex items-center gap-1.5 group px-1.5 py-1.5 rounded-lg transition-colors"
@@ -1349,6 +1379,14 @@ export default function WeeklyBoard() {
                         </button>
                       </div>
                     ))}
+                    {dayTodos.length > todoRows && (
+                      <div
+                        className="px-1.5 py-0.5 text-[11px] rounded cursor-default"
+                        style={{ color: 'var(--text-dim)' }}
+                      >
+                        +{dayTodos.length - todoRows}개 더
+                      </div>
+                    )}
                     {isAdding && !isMobile ? (
                       <div className="flex items-center gap-1.5 px-1">
                         <input
