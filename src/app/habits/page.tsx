@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
 import { format, subDays, addDays } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -28,6 +28,13 @@ interface Habit {
   weekHistory: WeekDay[]
 }
 
+const EMOJI_OPTIONS = [
+  '✨','🔥','💪','🏃','🧘','📚','💧','🥗','😴','✍️',
+  '🎵','🌿','🎯','💊','🧹','🌅','🍎','🚶','🧠','🎨',
+  '📝','🌙','☕','🫁','🏋️','🚴','🧴','⭐','🌟','💡',
+  '🎸','🍵','🏊','🌸','🦷','📖','🎧','🌱','💤','🏅',
+]
+
 const COLOR_OPTIONS = [
   '#c78928', '#95a586', '#688ac4', '#c47858',
   '#a858c4', '#58c4a8', '#c45878', '#7878c4',
@@ -43,7 +50,9 @@ export default function HabitsPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [formData, setFormData] = useState({ name: '', emoji: '✨', color: '#c78928' })
   const [adding, setAdding] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
+  const emojiPickerRef = useRef<HTMLDivElement>(null)
 
   const dateStr = format(currentDate, 'yyyy-MM-dd')
 
@@ -63,6 +72,17 @@ export default function HabitsPage() {
   }
 
   useEffect(() => { fetchHabits() }, [dateStr])
+
+  useEffect(() => {
+    if (!showEmojiPicker) return
+    const handler = (e: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showEmojiPicker])
 
   const toggleHabit = async (habitId: string) => {
     const habit = habits.find((h) => h.id === habitId)
@@ -219,14 +239,38 @@ export default function HabitsPage() {
         >
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>새 습관 추가</h3>
           <div className="flex gap-2">
-            <input
-              type="text"
-              value={formData.emoji}
-              onChange={(e) => setFormData((f) => ({ ...f, emoji: e.target.value }))}
-              className="w-12 rounded-lg px-2 py-2 text-sm text-center focus:outline-none"
-              style={{ background: 'var(--bg-input)', border: '1px solid var(--border)', color: 'var(--text)' }}
-              maxLength={2}
-            />
+            <div className="relative" ref={emojiPickerRef}>
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(v => !v)}
+                className="w-12 h-[38px] rounded-lg text-xl flex items-center justify-center transition-all"
+                style={{ background: 'var(--bg-input)', border: `1px solid ${showEmojiPicker ? 'var(--accent)' : 'var(--border)'}` }}
+              >
+                {formData.emoji}
+              </button>
+              {showEmojiPicker && (
+                <div
+                  className="absolute left-0 top-full mt-1 z-50 rounded-xl p-2 shadow-xl"
+                  style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', width: 232 }}
+                >
+                  <div className="grid grid-cols-8 gap-1">
+                    {EMOJI_OPTIONS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => { setFormData(f => ({ ...f, emoji })); setShowEmojiPicker(false) }}
+                        className="w-7 h-7 text-lg flex items-center justify-center rounded-lg transition-all hover:scale-110"
+                        style={{
+                          background: formData.emoji === emoji ? 'var(--accent-dim)' : 'transparent',
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <input
               type="text"
               value={formData.name}
