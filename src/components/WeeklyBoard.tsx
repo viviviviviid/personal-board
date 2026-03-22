@@ -1632,20 +1632,20 @@ export default function WeeklyBoard() {
 
       {view === 'weekly' && <div
         key={currentWeekStart.toISOString()}
-        ref={gridScrollRef}
-        className={`flex-1 overflow-auto rounded-xl${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
+        className={`flex-1 flex flex-col rounded-xl overflow-hidden${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
         style={{ minWidth: 0, border: '1px solid var(--border)' }}
         onAnimationEnd={() => setSlideDir(null)}
       >
+        {/* ── 상단 고정: 헤더 + 하이라이트 + TO-DO ── */}
+        <div style={{ flexShrink: 0, overflowX: isMobile ? 'hidden' : 'auto' }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? mobileCols : gridCols,
           minWidth: isMobile ? 0 : '760px',
         }}>
 
-          {/* ── Day headers (sticky) ── */}
+          {/* ── Day headers ── */}
           <div
-            className="sticky top-0 z-30"
             style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}
           />
           {visibleDays.map((day) => {
@@ -1656,7 +1656,7 @@ export default function WeeklyBoard() {
             return (
               <div
                 key={wi}
-                className="sticky top-0 z-30 px-2 py-2"
+                className="px-2 py-2"
                 style={{
                   background: today ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-surface)',
                   borderLeft: '1px solid var(--border)',
@@ -1927,9 +1927,24 @@ export default function WeeklyBoard() {
             )
           })}
 
+        </div>{/* grid 끝 (상단: 헤더+하이라이트+TODO) */}
+        </div>{/* 상단 고정 컨테이너 끝 */}
+
+        {/* ── 하단 독립 스크롤: 타임라인 ── */}
+        <div
+          ref={gridScrollRef}
+          className="flex-1 overflow-auto"
+          style={{ overscrollBehavior: 'contain' }}
+        >
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? mobileCols : gridCols,
+          minWidth: isMobile ? 0 : '760px',
+        }}>
+
           {/* ── Timeline separator ── */}
           <div
-            style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)' }}
+            style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', position: 'sticky', top: 0, zIndex: 20 }}
             className="flex items-center gap-2 px-3 py-1"
           >
             <div className="w-1 h-1 rounded-full" style={{ background: 'var(--accent-dim)' }} />
@@ -2287,7 +2302,8 @@ export default function WeeklyBoard() {
               </div>
             )
           })}
-        </div>
+        </div>{/* grid 끝 (타임라인) */}
+        </div>{/* 하단 타임라인 스크롤 컨테이너 끝 */}
       </div>}
     </div>
   )
