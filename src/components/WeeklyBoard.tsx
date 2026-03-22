@@ -1438,7 +1438,7 @@ export default function WeeklyBoard() {
 
       {/* 모바일 날짜 탭 */}
       {view === 'weekly' && isMobile && (
-        <div className="flex gap-1 mb-3 overflow-x-auto flex-shrink-0">
+        <div className="flex gap-1 mb-3 flex-shrink-0">
           {weekDays.map((day, i) => {
             const today = isToday(day)
             const isSelected = i >= mobileStart && i < mobileStart + mobileDayCols
@@ -1446,11 +1446,11 @@ export default function WeeklyBoard() {
               <button
                 key={i}
                 onClick={() => setMobileDay(i)}
-                className="flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl flex-shrink-0 transition-all"
+                className="flex flex-col items-center gap-0.5 px-1 py-2 rounded-xl flex-1 transition-all"
                 style={{
                   background: isSelected ? 'var(--accent-dim)' : today ? 'rgba(139,92,246,0.06)' : 'var(--bg-card)',
                   border: `1px solid ${isSelected ? 'var(--accent)' : today ? 'rgba(139,92,246,0.3)' : 'var(--border)'}`,
-                  minWidth: 48,
+                  minWidth: 0,
                 }}
               >
                 <span
@@ -1460,7 +1460,7 @@ export default function WeeklyBoard() {
                   {DAYS_KO[i]}
                 </span>
                 <span
-                  className="text-lg font-bold leading-none"
+                  className="text-base font-bold leading-none"
                   style={{ color: isSelected ? 'var(--accent-light)' : today ? 'var(--accent-light)' : 'var(--text-bright)' }}
                 >
                   {format(day, 'd')}
@@ -1679,31 +1679,34 @@ export default function WeeklyBoard() {
                     >★</button>
                   </div>
                 ) : (
-                  <>
-                    <div className="text-[11px] font-semibold tracking-wide" style={{ color: today ? 'var(--accent)' : wi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}>{DAYS_KO[wi]}</div>
-                    <div className="text-xl font-bold leading-tight" style={{ color: today ? 'var(--accent-light)' : 'var(--text-bright)' }}>{format(day, 'd')}</div>
-                    <div className="text-[9px]" style={{ color: 'var(--text-dim)' }}>{format(day, 'MM/dd')}</div>
-                  </>
+                  <div className="flex items-start justify-between gap-0.5">
+                    <div>
+                      <div className="text-[11px] font-semibold tracking-wide" style={{ color: today ? 'var(--accent)' : wi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}>{DAYS_KO[wi]}</div>
+                      <div className="text-xl font-bold leading-tight" style={{ color: today ? 'var(--accent-light)' : 'var(--text-bright)' }}>{format(day, 'd')}</div>
+                      <div className="text-[9px]" style={{ color: 'var(--text-dim)' }}>{format(day, 'MM/dd')}</div>
+                    </div>
+                    <button
+                      onClick={() => setHighlightOpenDay(d => d === dayKey ? null : dayKey)}
+                      className="text-sm leading-none px-1 py-0.5 rounded transition-all flex-shrink-0"
+                      style={{
+                        color: hasHighlight || highlightOpenDay === dayKey ? '#ca8a04' : 'rgba(202,138,4,0.25)',
+                        background: highlightOpenDay === dayKey ? 'rgba(234,179,8,0.1)' : 'transparent',
+                      }}
+                    >★</button>
+                  </div>
                 )}
               </div>
             )
           })}
 
-          {/* ── Highlight section ── */}
-          {!isMobile && (
-            <div
-              className="flex items-center justify-end pr-1.5"
-              style={{ background: 'rgba(234,179,8,0.06)', borderBottom: '1px solid var(--border)', minHeight: 40 }}
-            >
-              <span className="text-[9px] tracking-widest font-semibold" style={{ color: '#ca8a04' }}>★</span>
-            </div>
-          )}
+          {/* ── Highlight section ── (데스크탑: 별표가 헤더에 있으므로 별도 라벨 열 없음) */}
+          {!isMobile && <div />}
           {visibleDays.map((day) => {
             const dayKey = format(day, 'yyyy-MM-dd')
             const h = highlights.find(x => x.date === dayKey)
             const today = isToday(day)
             const isOpen = highlightOpenDay === dayKey
-            if (isMobile && !h && !isOpen) return null
+            if (!h && !isOpen) return <div key={`hl-${dayKey}`} />
             return (
               <div key={`hl-${dayKey}`} style={isMobile ? { gridColumn: '1 / -1' } : undefined}>
                 <HighlightCell
@@ -1760,7 +1763,7 @@ export default function WeeklyBoard() {
                     {dayTodos.map(todo => (
                       <div
                         key={todo.id}
-                        className="flex items-center gap-1.5 group px-1.5 py-1.5 rounded-lg transition-colors"
+                        className="flex items-start gap-1.5 group px-1.5 py-1.5 rounded-lg transition-colors"
                         style={{ cursor: 'default' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -1768,7 +1771,7 @@ export default function WeeklyBoard() {
                         {/* 체크박스 */}
                         <button
                           onClick={() => toggleTodo(todo.id, todo.completed)}
-                          className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center transition-all"
+                          className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center transition-all mt-0.5"
                           style={{
                             background: todo.completed ? 'var(--accent-dim)' : 'transparent',
                             border: `1.5px solid ${todo.completed ? 'var(--accent)' : 'var(--border)'}`,
@@ -1785,24 +1788,23 @@ export default function WeeklyBoard() {
                         >
                           {todo.completed && <Check size={10} style={{ color: 'var(--accent-light)' }} />}
                         </button>
-                        {/* 우선순위 점 */}
-                        <div
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{
-                            background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium,
-                            opacity: todo.completed ? 0.3 : 0.8,
-                          }}
-                        />
+                        {/* 우선순위 점 — 모바일에서는 숨김 */}
+                        {!isMobile && (
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0 mt-1"
+                            style={{
+                              background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium,
+                              opacity: todo.completed ? 0.3 : 0.8,
+                            }}
+                          />
+                        )}
                         <span
-                          className="text-[12px] leading-snug flex-1 min-w-0 break-words"
+                          className="text-[12px] leading-snug flex-1 min-w-0 break-all"
                           style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
                         >
+                          {todo.recurringRuleId && <span style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }}>🔁</span>}
                           {todo.title}
                         </span>
-                        {/* 반복 인디케이터 */}
-                        {todo.recurringRuleId && (
-                          <span title="반복 할일" style={{ color: 'var(--text-dim)', flexShrink: 0, fontSize: 10 }}>🔁</span>
-                        )}
                         {/* 긴급 버튼 */}
                         <button
                           onClick={() => toggleUrgent(todo.id, todo.urgent)}
@@ -2394,8 +2396,6 @@ function HighlightCell({
             <X size={9} />
           </button>
         </div>
-      ) : !isMobile ? (
-        <span className="text-[10px]" style={{ color: 'rgba(202,138,4,0.35)' }}>+ 설정</span>
       ) : null}
     </div>
   )
