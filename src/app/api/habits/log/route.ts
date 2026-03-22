@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
-import { startOfDay } from 'date-fns'
-
 export async function POST(request: NextRequest) {
   try {
     const session = await auth()
@@ -16,12 +14,13 @@ export async function POST(request: NextRequest) {
     }
 
     const dateObj = new Date(date)
+    dateObj.setUTCHours(0, 0, 0, 0)
 
     const log = await prisma.habitLog.upsert({
       where: {
         habitId_date: {
           habitId,
-          date: startOfDay(dateObj),
+          date: dateObj,
         },
       },
       update: {
@@ -29,7 +28,7 @@ export async function POST(request: NextRequest) {
       },
       create: {
         habitId,
-        date: startOfDay(dateObj),
+        date: dateObj,
         completed: completed ?? true,
       },
     })

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
-import { startOfDay, endOfDay, subDays } from 'date-fns'
+import { subDays } from 'date-fns'
 import { computeStreak, getWeekHistory } from '@/lib/habitUtils'
 
 export async function GET(request: NextRequest) {
@@ -12,6 +12,11 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const dateParam = searchParams.get('date')
     const date = dateParam ? new Date(dateParam) : new Date()
+    date.setUTCHours(0, 0, 0, 0)
+
+    const rangeStart = subDays(date, 90)
+    const rangeEnd = new Date(date)
+    rangeEnd.setUTCHours(23, 59, 59, 999)
 
     const habits = await prisma.habit.findMany({
       where: { userId: session.user.id },
@@ -20,8 +25,8 @@ export async function GET(request: NextRequest) {
         logs: {
           where: {
             date: {
-              gte: startOfDay(subDays(date, 90)),
-              lte: endOfDay(date),
+              gte: rangeStart,
+              lte: rangeEnd,
             },
           },
           orderBy: { date: 'desc' },
@@ -29,8 +34,8 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const todayStart = startOfDay(date)
-    const todayEnd = endOfDay(date)
+    const todayStart = date
+    const todayEnd = rangeEnd
 
     const result = habits.map(habit => {
       const todayLogs = habit.logs.filter(
