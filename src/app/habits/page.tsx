@@ -336,29 +336,42 @@ export default function HabitsPage() {
       {/* Stats bar */}
       {habits.length > 0 && !loading && (
         <div
-          className="mb-6 rounded-xl p-4"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+          className="mb-6 rounded-xl p-4 mx-auto"
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', width: 'max-content', maxWidth: '100%' }}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>오늘의 달성률</span>
-            <span className="text-xl font-bold" style={{ color: 'var(--text-bright)' }}>
-              {completedCount}/{habits.length}
-            </span>
-          </div>
-          <div className="w-full rounded-full h-2" style={{ background: 'var(--bg-input)' }}>
-            <div
-              className="h-2 rounded-full transition-all duration-700"
-              style={{
-                width: `${habits.length > 0 ? (completedCount / habits.length) * 100 : 0}%`,
-                background: 'linear-gradient(90deg, var(--success-dim), var(--success))',
-              }}
-            />
-          </div>
-          {completedCount === habits.length && habits.length > 0 && (
-            <div className="mt-2 text-sm text-center" style={{ color: 'var(--success)' }}>
-              🎉 오늘 모든 습관을 완료했습니다!
-            </div>
-          )}
+          {/* 헤더: 달성률은 heatmap 폭에 맞춤 */}
+          {habits[0]?.heatmapHistory && (() => {
+            const CELL2 = 12, GAP2 = 3, STEP2 = CELL2 + GAP2
+            const startOff = (parseISO(habits[0].heatmapHistory[0].date).getDay() + 6) % 7
+            const totalCols2 = Math.ceil((startOff + habits[0].heatmapHistory.length) / 7)
+            const labelW = 24  // 16px label + 8px gap
+            const gridW = totalCols2 * STEP2 - GAP2
+            const rowW = labelW + gridW
+            return (
+              <div style={{ width: rowW }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm" style={{ color: 'var(--text-muted)' }}>오늘의 달성률</span>
+                  <span className="text-xl font-bold" style={{ color: 'var(--text-bright)' }}>
+                    {completedCount}/{habits.length}
+                  </span>
+                </div>
+                <div className="rounded-full h-2" style={{ background: 'var(--bg-input)' }}>
+                  <div
+                    className="h-2 rounded-full transition-all duration-700"
+                    style={{
+                      width: `${habits.length > 0 ? (completedCount / habits.length) * 100 : 0}%`,
+                      background: 'linear-gradient(90deg, var(--success-dim), var(--success))',
+                    }}
+                  />
+                </div>
+                {completedCount === habits.length && habits.length > 0 && (
+                  <div className="mt-2 text-sm text-center" style={{ color: 'var(--success)' }}>
+                    🎉 오늘 모든 습관을 완료했습니다!
+                  </div>
+                )}
+              </div>
+            )
+          })()}
           {/* GitHub-style 210-day heatmap */}
           {habits[0]?.heatmapHistory && (() => {
             const CELL = 12, GAP = 3, STEP = CELL + GAP
@@ -402,7 +415,7 @@ export default function HabitsPage() {
                   <div
                     ref={heatmapScrollRef}
                     className="overflow-x-auto"
-                    style={{ scrollbarWidth: 'none', flex: 1 }}
+                    style={{ scrollbarWidth: 'none' }}
                   >
                     {/* 월 레이블 행 */}
                     <div style={{ position: 'relative', height: 18, marginBottom: 2, minWidth: totalCols * STEP }}>
