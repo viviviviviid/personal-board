@@ -1699,8 +1699,8 @@ export default function WeeklyBoard() {
             )
           })}
 
-          {/* ── Highlight section ── (데스크탑: 별표가 헤더에 있으므로 별도 라벨 열 없음) */}
-          {!isMobile && <div />}
+          {/* ── Highlight section ── */}
+          <div />{/* 레이블 열 자리 채우기 — grid row 정렬을 위해 항상 출력 */}
           {visibleDays.map((day) => {
             const dayKey = format(day, 'yyyy-MM-dd')
             const h = highlights.find(x => x.date === dayKey)
@@ -1708,7 +1708,7 @@ export default function WeeklyBoard() {
             const isOpen = highlightOpenDay === dayKey
             if (!h && !isOpen) return <div key={`hl-${dayKey}`} />
             return (
-              <div key={`hl-${dayKey}`} style={isMobile ? { gridColumn: '1 / -1' } : undefined}>
+              <div key={`hl-${dayKey}`}>
                 <HighlightCell
                   day={day}
                   dayKey={dayKey}
