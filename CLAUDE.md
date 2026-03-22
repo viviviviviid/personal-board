@@ -65,6 +65,8 @@ if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { st
 - `DailyHighlight` 모델: `@@unique([userId, date])` — 유저별 날짜당 1개
 - API: `/api/daily-highlight` GET(week 파라미터)/POST(upsert)/PATCH/DELETE
 - WeeklyBoard.tsx 하단 `HighlightCell` 컴포넌트 (파일 내 정의)
+- 날짜 헤더 우측 ★ 버튼으로 토글 (모바일·데스크탑 동일) — 별도 하이라이트 행 없음
+- 하이라이트 섹션은 항상 레이블 열 포함 `1+N`개 셀 출력 필수 — 부족하면 grid 자동배치가 TODO 행과 뒤섞임
 
 ### 포모도로 타이머
 - `src/components/PomodoroTimer.tsx` — 독립 컴포넌트, DB 없이 localStorage만 사용
@@ -91,6 +93,15 @@ if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { st
 - 수정: 인라인 편집 (제목/시간/카테고리), 저장 시 반복 항목이면 `single`/`all` 선택
 - 삭제: 반복 항목이면 `single`/`future`/`all` 3가지 옵션 다이얼로그
 - API: `DELETE /api/timeline/[id]?mode=single|future|all`, `PATCH` body에 `mode: 'single'|'all'`
+
+### 주간 보드 레이아웃 구조
+- `WeeklyBoard.tsx`의 주간 보드는 두 개의 독립 컨테이너로 분리됨
+- **상단 고정** (`flexShrink: 0`): 날짜 헤더 + 하이라이트 + TO-DO — 스크롤 없음, 항상 보임
+- **하단 독립 스크롤** (`flex-1 overflow-auto`, `ref={gridScrollRef}`): 타임라인만 — 독립 스크롤
+- `overscrollBehavior: contain` — 타임라인 스크롤이 외부로 전파되지 않음
+- 두 컨테이너는 동일한 `gridTemplateColumns`/`minWidth` 공유해 열 너비 정렬 유지
+- 타임라인 진입 스크롤(`gridScrollRef.scrollTo`) — 첫 항목 위치 or 기본 9시
+- 하이라이트 섹션 grid 셀은 반드시 `1(레이블) + N(날짜)` = 전체 컬럼 수만큼 출력 필수
 
 ### 타임라인 생성 UX
 - 빈 공간 **드래그** → 보라색 미리보기 블록 + 시간 레이블 표시, mouseup 시 선택 범위로 폼 열림
