@@ -361,77 +361,98 @@ export default function HabitsPage() {
           )}
           {/* GitHub-style 210-day heatmap */}
           {habits[0]?.heatmapHistory && (() => {
-            // 날짜별 전체 달성률 집계 (210일)
+            const CELL = 12, GAP = 3, STEP = CELL + GAP
             const heatmapSummary = habits[0].heatmapHistory.map((_, i) => ({
               date: habits[0].heatmapHistory[i].date,
               rate: habits.filter(h => h.heatmapHistory?.[i]?.completed).length / habits.length,
             }))
-            // ISO 요일 오프셋 (월=0 ... 일=6)
             const startIsoDay = (parseISO(heatmapSummary[0].date).getDay() + 6) % 7
-            const ISO_LABELS = ['월', '화', '수', '목', '금', '토', '일']
+            const totalCols = Math.ceil((startIsoDay + heatmapSummary.length) / 7)
+            // 월 레이블: 월이 바뀌는 첫 번째 열 위치 수집
+            const monthLabels: { col: number; label: string }[] = []
+            let prevMonth = -1
+            heatmapSummary.forEach((day, i) => {
+              const col = Math.floor((startIsoDay + i) / 7)
+              const d = parseISO(day.date)
+              if (d.getMonth() !== prevMonth) {
+                monthLabels.push({ col, label: format(d, 'M월') })
+                prevMonth = d.getMonth()
+              }
+            })
+            const rateColor = (rate: number) => rate === 0 ? 'var(--bg-input)'
+              : rate <= 0.25 ? 'rgba(88,196,168,0.2)'
+              : rate <= 0.5 ? 'rgba(88,196,168,0.42)'
+              : rate <= 0.75 ? 'rgba(88,196,168,0.65)'
+              : rate < 1 ? 'rgba(88,196,168,0.85)'
+              : 'rgba(88,196,168,1)'
+            // 요일 레이블: 월/수/금만 표시 (GitHub 스타일)
+            const DAY_ROW_LABELS = ['월', '', '수', '', '금', '', '']
             return (
               <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-dim)' }}>
-                <span className="text-xs mb-2 block" style={{ color: 'var(--text-dim)' }}>전체 달성 현황 (최근 30주)</span>
-                <div className="flex gap-1.5">
+                <div className="flex gap-2">
                   {/* 요일 레이블 */}
-                  <div className="flex flex-col gap-0.5 flex-shrink-0" style={{ paddingTop: 0 }}>
-                    {ISO_LABELS.map(label => (
-                      <div key={label} style={{ width: 10, height: 11, fontSize: 8, lineHeight: '11px', color: 'var(--text-dim)', textAlign: 'right' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: GAP, paddingTop: 20, flexShrink: 0 }}>
+                    {DAY_ROW_LABELS.map((label, i) => (
+                      <div key={i} style={{ height: CELL, width: 16, fontSize: 9, lineHeight: `${CELL}px`, color: 'var(--text-dim)', textAlign: 'right' }}>
                         {label}
                       </div>
                     ))}
                   </div>
-                  {/* 잔디 그리드 */}
+                  {/* 그리드 + 월 레이블 */}
                   <div
                     ref={heatmapScrollRef}
                     className="overflow-x-auto"
-                    style={{ scrollbarWidth: 'none' }}
+                    style={{ scrollbarWidth: 'none', flex: 1 }}
                   >
+                    {/* 월 레이블 행 */}
+                    <div style={{ position: 'relative', height: 18, marginBottom: 2, minWidth: totalCols * STEP }}>
+                      {monthLabels.map(({ col, label }) => (
+                        <span key={label} style={{ position: 'absolute', left: col * STEP, fontSize: 9, color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                    {/* 잔디 그리드 */}
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateRows: 'repeat(7, 11px)',
+                        gridTemplateRows: `repeat(7, ${CELL}px)`,
                         gridAutoFlow: 'column',
-                        gap: 2,
+                        gap: GAP,
                       }}
                     >
-                      {/* 시작 요일 맞춤 빈 칸 */}
                       {Array.from({ length: startIsoDay }, (_, i) => (
-                        <div key={`pad-${i}`} style={{ width: 11, height: 11 }} />
+                        <div key={`pad-${i}`} style={{ width: CELL, height: CELL }} />
                       ))}
-                      {heatmapSummary.map((day) => {
-                        const level = day.rate === 0 ? 0
-                          : day.rate <= 0.25 ? 1
-                          : day.rate <= 0.5 ? 2
-                          : day.rate <= 0.75 ? 3
-                          : day.rate < 1 ? 4
-                          : 5
-                        const bg = level === 0 ? 'var(--bg-input)'
-                          : level === 1 ? 'rgba(88,196,168,0.2)'
-                          : level === 2 ? 'rgba(88,196,168,0.42)'
-                          : level === 3 ? 'rgba(88,196,168,0.62)'
-                          : level === 4 ? 'rgba(88,196,168,0.82)'
-                          : 'rgba(88,196,168,1)'
-                        return (
+                      {heatmapSummary.map((day) => (
                         <div
                           key={day.date}
                           onMouseEnter={(e) => setHeatmapTooltip({ date: day.date, rate: day.rate, x: e.clientX, y: e.clientY })}
                           onMouseMove={(e) => setHeatmapTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : t)}
                           onMouseLeave={() => setHeatmapTooltip(null)}
                           style={{
-                            width: 11,
-                            height: 11,
+                            width: CELL,
+                            height: CELL,
                             borderRadius: 2,
-                            background: bg,
-                            outline: day.date === dateStr ? '1.5px solid var(--accent)' : 'none',
+                            background: rateColor(day.rate),
+                            outline: day.date === dateStr ? `1.5px solid var(--accent)` : 'none',
                             flexShrink: 0,
                             cursor: 'default',
-                            transition: 'filter 0.1s',
                           }}
-                          className="hover:brightness-125"
+                          className="hover:brightness-125 transition-[filter]"
                         />
-                        )
-                      })}
+                      ))}
+                    </div>
+                    {/* Less / More 범례 */}
+                    <div className="flex items-center gap-1 mt-2 justify-end">
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>Less</span>
+                      {[0, 1, 2, 3, 4, 5].map(level => (
+                        <div key={level} style={{
+                          width: 10, height: 10, borderRadius: 2,
+                          background: rateColor([0, 0.1, 0.35, 0.6, 0.85, 1][level]),
+                        }} />
+                      ))}
+                      <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>More</span>
                     </div>
                   </div>
                 </div>
@@ -466,7 +487,7 @@ export default function HabitsPage() {
           </button>
         </div>
       ) : (
-        <div className="space-y-2 max-w-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
           {habits.map((habit) => {
             const isCompleted = habit.logs.some((l) => l.completed)
             return (
