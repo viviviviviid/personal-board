@@ -33,15 +33,19 @@ async function fetchCalendarEvents(
 
   const data = await res.json()
   return (data.items ?? [])
-    .filter((e: RawEvent) => e.start?.dateTime)
-    .map((e: RawEvent) => ({
-      id: `${calendarId}::${e.id}`,
-      summary: e.summary,
-      start: { dateTime: e.start!.dateTime! },
-      end: { dateTime: e.end?.dateTime ?? e.start!.dateTime! },
-      calendarId,
-      calendarColor,
-    }))
+    .filter((e: RawEvent) => e.start?.dateTime || e.start?.date)
+    .map((e: RawEvent) => {
+      const allDay = !e.start?.dateTime
+      return {
+        id: `${calendarId}::${e.id}`,
+        summary: e.summary,
+        start: allDay ? { date: e.start!.date! } : { dateTime: e.start!.dateTime! },
+        end: allDay ? { date: e.end?.date ?? e.start!.date! } : { dateTime: e.end?.dateTime ?? e.start!.dateTime! },
+        calendarId,
+        calendarColor,
+        allDay,
+      }
+    })
 }
 
 export async function GET(request: NextRequest) {
@@ -71,9 +75,11 @@ export async function GET(request: NextRequest) {
       )
     )
 
-    const events = results.flat().sort((a, b) =>
-      new Date(a.start.dateTime).getTime() - new Date(b.start.dateTime).getTime()
-    )
+    const events = results.flat().sort((a, b) => {
+      const aTime = a.allDay ? new Date(a.start.date!).getTime() : new Date(a.start.dateTime!).getTime()
+      const bTime = b.allDay ? new Date(b.start.date!).getTime() : new Date(b.start.dateTime!).getTime()
+      return aTime - bTime
+    })
 
     return NextResponse.json({ events })
   } catch (error) {

@@ -24,10 +24,11 @@ interface GoogleCalendar {
 interface GoogleCalendarEvent {
   id: string
   summary?: string
-  start: { dateTime: string }
-  end: { dateTime: string }
+  start: { dateTime?: string; date?: string }
+  end: { dateTime?: string; date?: string }
   calendarId: string
   calendarColor: string
+  allDay?: boolean
 }
 
 interface Todo {
@@ -476,8 +477,8 @@ function EntryDetailPopover({ entry, anchorRect, onClose, onUpdated, onDeleted }
 
 // ── Google Event block ──────────────────────────────────────────────────────
 function GoogleEventBlock({ event, layoutCol = 0, layoutTotal = 1 }: { event: GoogleCalendarEvent; layoutCol?: number; layoutTotal?: number }) {
-  const startTime = format(new Date(event.start.dateTime), 'HH:mm')
-  const endTime = format(new Date(event.end.dateTime), 'HH:mm')
+  const startTime = format(new Date(event.start.dateTime!), 'HH:mm')
+  const endTime = format(new Date(event.end.dateTime!), 'HH:mm')
   const top = timeToY(startTime)
   const height = Math.max(20, timeToY(endTime) - top)
   const color = event.calendarColor ?? '#4285F4'
@@ -1121,7 +1122,9 @@ export default function WeeklyBoard() {
   const entriesForDay = (day: Date) =>
     timeline.filter(e => isSameDay(new Date(e.date), day))
   const googleEventsForDay = (day: Date) =>
-    googleEvents.filter(e => isSameDay(new Date(e.start.dateTime), day))
+    googleEvents.filter(e => !e.allDay && isSameDay(new Date(e.start.dateTime!), day))
+  const allDayGoogleEventsForDay = (day: Date) =>
+    googleEvents.filter(e => e.allDay && isSameDay(new Date(e.start.date!), day))
   const weekLabel = `${format(currentWeekStart, 'yyyy.MM.dd')} — ${format(addDays(currentWeekStart, 6), 'MM.dd')}`
   const monthLabel = monthCount === 1
     ? format(currentMonth, 'yyyy년 M월')
@@ -1952,6 +1955,72 @@ export default function WeeklyBoard() {
             </span>
           </div>
 
+          {/* ── All-day events row ── */}
+          {visibleDays.some(day => allDayGoogleEventsForDay(day).length > 0) && (
+            <>
+              <div
+                style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', minHeight: 28 }}
+                className="flex items-center justify-end pr-1"
+              >
+                <span className="text-[8px] opacity-40" style={{ color: 'var(--text-dim)' }}>종일</span>
+              </div>
+              {visibleDays.map(day => {
+                const events = allDayGoogleEventsForDay(day)
+                return (
+                  <div
+                    key={format(day, 'yyyy-MM-dd') + '-allday'}
+                    style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-dim)', borderRight: '1px solid var(--border-dim)', minHeight: 28, padding: '3px 4px' }}
+                    className="flex flex-col gap-0.5"
+                  >
+                    {events.map(e => (
+                      <div
+                        key={e.id}
+                        className="text-[9px] rounded px-1 py-0.5 truncate leading-tight"
+                        style={{ background: e.calendarColor + '33', color: e.calendarColor, border: '1px solid ' + e.calendarColor + '66' }}
+                        title={e.summary}
+                      >
+                        {e.summary ?? '(제목 없음)'}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </>
+          )}
+
+          {/* ── All-day events row ── */}
+          {visibleDays.some(day => allDayGoogleEventsForDay(day).length > 0) && (
+            <>
+              <div
+                style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', minHeight: 28 }}
+                className="flex items-center justify-end pr-1"
+              >
+                <span className="text-[8px] opacity-40" style={{ color: 'var(--text-dim)' }}>종일</span>
+              </div>
+              {visibleDays.map(day => {
+                const events = allDayGoogleEventsForDay(day)
+                return (
+                  <div
+                    key={format(day, 'yyyy-MM-dd') + '-allday'}
+                    style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-dim)', borderRight: '1px solid var(--border-dim)', minHeight: 28, padding: '3px 4px' }}
+                    className="flex flex-col gap-0.5"
+                  >
+                    {events.map(e => (
+                      <div
+                        key={e.id}
+                        className="text-[9px] rounded px-1 py-0.5 truncate leading-tight"
+                        style={{ background: e.calendarColor + '33', color: e.calendarColor, border: '1px solid ' + e.calendarColor + '66' }}
+                        title={e.summary}
+                      >
+                        {e.summary ?? '(제목 없음)'}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </>
+          )}
+
           {/* ── Time labels ── */}
           <div style={{ position: 'relative', height: TOTAL_H, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}>
             {HOURS.map(hour => (
@@ -1977,7 +2046,7 @@ export default function WeeklyBoard() {
             // 겹치는 항목 레이아웃 계산 (로컬 + 구글 통합)
             const layoutItems = [
               ...dayEntries.map(e => ({ id: e.id, start: e.startTime, end: e.endTime || addOneHour(e.startTime) })),
-              ...dayGoogleEvents.map(e => ({ id: `g_${e.id}`, start: format(new Date(e.start.dateTime), 'HH:mm'), end: format(new Date(e.end.dateTime), 'HH:mm') })),
+              ...dayGoogleEvents.map(e => ({ id: `g_${e.id}`, start: format(new Date(e.start.dateTime!), 'HH:mm'), end: format(new Date(e.end.dateTime!), 'HH:mm') })),
             ]
             const layout = computeOverlapLayout(layoutItems)
 
