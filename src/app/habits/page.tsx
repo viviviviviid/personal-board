@@ -417,12 +417,13 @@ export default function HabitsPage() {
                       style={{
                         display: 'grid',
                         gridTemplateRows: `repeat(7, ${CELL}px)`,
+                        gridAutoColumns: `${CELL}px`,
                         gridAutoFlow: 'column',
                         gap: GAP,
                       }}
                     >
                       {Array.from({ length: startIsoDay }, (_, i) => (
-                        <div key={`pad-${i}`} style={{ width: CELL, height: CELL }} />
+                        <div key={`pad-${i}`} style={{ width: `${CELL}px`, height: `${CELL}px` }} />
                       ))}
                       {heatmapSummary.map((day) => (
                         <div
@@ -431,8 +432,8 @@ export default function HabitsPage() {
                           onMouseMove={(e) => setHeatmapTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : t)}
                           onMouseLeave={() => setHeatmapTooltip(null)}
                           style={{
-                            width: CELL,
-                            height: CELL,
+                            width: `${CELL}px`,
+                            height: `${CELL}px`,
                             borderRadius: 2,
                             background: rateColor(day.rate),
                             outline: day.date === dateStr ? `1.5px solid var(--accent)` : 'none',
