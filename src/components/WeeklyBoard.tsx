@@ -1988,39 +1988,6 @@ export default function WeeklyBoard() {
             </>
           )}
 
-          {/* ── All-day events row ── */}
-          {visibleDays.some(day => allDayGoogleEventsForDay(day).length > 0) && (
-            <>
-              <div
-                style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', minHeight: 28 }}
-                className="flex items-center justify-end pr-1"
-              >
-                <span className="text-[8px] opacity-40" style={{ color: 'var(--text-dim)' }}>종일</span>
-              </div>
-              {visibleDays.map(day => {
-                const events = allDayGoogleEventsForDay(day)
-                return (
-                  <div
-                    key={format(day, 'yyyy-MM-dd') + '-allday'}
-                    style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-dim)', borderRight: '1px solid var(--border-dim)', minHeight: 28, padding: '3px 4px' }}
-                    className="flex flex-col gap-0.5"
-                  >
-                    {events.map(e => (
-                      <div
-                        key={e.id}
-                        className="text-[9px] rounded px-1 py-0.5 truncate leading-tight"
-                        style={{ background: e.calendarColor + '33', color: e.calendarColor, border: '1px solid ' + e.calendarColor + '66' }}
-                        title={e.summary}
-                      >
-                        {e.summary ?? '(제목 없음)'}
-                      </div>
-                    ))}
-                  </div>
-                )
-              })}
-            </>
-          )}
-
           {/* ── Time labels ── */}
           <div style={{ position: 'relative', height: TOTAL_H, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}>
             {HOURS.map(hour => (
