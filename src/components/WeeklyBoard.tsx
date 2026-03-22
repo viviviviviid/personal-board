@@ -1799,7 +1799,7 @@ export default function WeeklyBoard() {
                           />
                         )}
                         <span
-                          className="text-[12px] leading-snug flex-1 min-w-0 break-all"
+                          className="text-[12px] leading-snug flex-1 min-w-0 break-words"
                           style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
                         >
                           {todo.recurringRuleId && <span style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }}>🔁</span>}
