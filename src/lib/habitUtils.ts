@@ -1,5 +1,20 @@
 import { format, subDays } from 'date-fns'
 
+export function getHeatmapHistory(
+  logs: LogEntry[],
+  today: Date,
+  nDays = 210
+): { date: string; completed: boolean }[] {
+  const completedDates = new Set(
+    logs.filter(l => l.completed).map(l => format(l.date, 'yyyy-MM-dd'))
+  )
+  return Array.from({ length: nDays }, (_, i) => {
+    const d = subDays(today, nDays - 1 - i)
+    const dateStr = format(d, 'yyyy-MM-dd')
+    return { date: dateStr, completed: completedDates.has(dateStr) }
+  })
+}
+
 export interface LogEntry {
   date: Date
   completed: boolean

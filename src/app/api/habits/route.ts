@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { subDays } from 'date-fns'
-import { computeStreak, getWeekHistory } from '@/lib/habitUtils'
+import { computeStreak, getWeekHistory, getHeatmapHistory } from '@/lib/habitUtils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
     const date = dateParam ? new Date(dateParam) : new Date()
     date.setUTCHours(0, 0, 0, 0)
 
-    const rangeStart = subDays(date, 90)
+    const rangeStart = subDays(date, 210)
     const rangeEnd = new Date(date)
     rangeEnd.setUTCHours(23, 59, 59, 999)
 
@@ -43,11 +43,13 @@ export async function GET(request: NextRequest) {
       )
       const streak = computeStreak(habit.logs, date)
       const weekHistory = getWeekHistory(habit.logs, date)
+      const heatmapHistory = getHeatmapHistory(habit.logs, date)
       return {
         ...habit,
         logs: todayLogs,
         streak,
         weekHistory,
+        heatmapHistory,
       }
     })
 

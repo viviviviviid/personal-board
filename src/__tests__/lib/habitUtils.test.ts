@@ -1,4 +1,4 @@
-import { computeStreak, getWeekHistory } from '@/lib/habitUtils'
+import { computeStreak, getWeekHistory, getHeatmapHistory } from '@/lib/habitUtils'
 
 function makeDate(daysAgo: number): Date {
   const d = new Date('2026-03-20T12:00:00Z')
@@ -97,5 +97,67 @@ describe('getWeekHistory', () => {
     const logs = [{ date: makeDate(0), completed: false }]
     const history = getWeekHistory(logs, TODAY)
     expect(history.every(h => !h.completed)).toBe(true)
+  })
+})
+
+describe('getHeatmapHistory', () => {
+  test('returns nDays entries (default 210)', () => {
+    expect(getHeatmapHistory([], TODAY)).toHaveLength(210)
+  })
+
+  test('returns custom nDays entries', () => {
+    expect(getHeatmapHistory([], TODAY, 30)).toHaveLength(30)
+  })
+
+  test('last entry is today', () => {
+    const history = getHeatmapHistory([], TODAY, 210)
+    expect(history[209].date).toBe('2026-03-20')
+  })
+
+  test('first entry is nDays-1 days ago', () => {
+    const history = getHeatmapHistory([], TODAY, 210)
+    // 209 days before 2026-03-20 = 2025-08-23
+    expect(history[0].date).toBe('2025-08-23')
+  })
+
+  test('marks completed days correctly', () => {
+    const logs = [
+      { date: makeDate(0), completed: true },   // today
+      { date: makeDate(10), completed: true },  // 10 days ago
+      { date: makeDate(10), completed: false }, // ignored (not completed)
+    ]
+    const history = getHeatmapHistory(logs, TODAY, 210)
+    expect(history[209].completed).toBe(true)   // today
+    expect(history[199].completed).toBe(true)   // 10 days ago
+    expect(history[208].completed).toBe(false)  // yesterday
+  })
+
+  test('all false when no completed logs', () => {
+    const logs = [{ date: makeDate(0), completed: false }]
+    const history = getHeatmapHistory(logs, TODAY, 210)
+    expect(history.every(h => !h.completed)).toBe(true)
+  })
+
+  test('entries are in chronological order (oldest first)', () => {
+    const history = getHeatmapHistory([], TODAY, 7)
+    for (let i = 1; i < history.length; i++) {
+      expect(history[i].date > history[i - 1].date).toBe(true)
+    }
+  })
+
+  test('logs outside the range are not included', () => {
+    // 300 days ago — outside 210-day window
+    const logs = [{ date: makeDate(300), completed: true }]
+    const history = getHeatmapHistory(logs, TODAY, 210)
+    expect(history.every(h => !h.completed)).toBe(true)
+  })
+
+  test('date strings use UTC to avoid timezone offset', () => {
+    // makeDate uses setUTCHours(0,0,0,0), so dates must match exactly
+    const logs = [{ date: makeDate(5), completed: true }]
+    const history = getHeatmapHistory(logs, TODAY, 210)
+    const fiveDaysAgo = history[204] // index 209 - 5
+    expect(fiveDaysAgo.completed).toBe(true)
+    expect(fiveDaysAgo.date).toBe('2026-03-15')
   })
 })

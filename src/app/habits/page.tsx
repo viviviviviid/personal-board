@@ -26,6 +26,7 @@ interface Habit {
   logs: HabitLog[]
   streak: number
   weekHistory: WeekDay[]
+  heatmapHistory: WeekDay[]
 }
 
 const EMOJI_OPTIONS = [
@@ -52,7 +53,9 @@ export default function HabitsPage() {
   const [adding, setAdding] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
+  const [heatmapTooltip, setHeatmapTooltip] = useState<{ date: string; rate: number; x: number; y: number } | null>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
+  const heatmapScrollRef = useRef<HTMLDivElement>(null)
 
   const dateStr = format(currentDate, 'yyyy-MM-dd')
 
@@ -72,6 +75,13 @@ export default function HabitsPage() {
   }
 
   useEffect(() => { fetchHabits() }, [dateStr])
+
+  // 잔디 그리드를 최신(우측)으로 자동 스크롤
+  useEffect(() => {
+    if (heatmapScrollRef.current) {
+      heatmapScrollRef.current.scrollLeft = heatmapScrollRef.current.scrollWidth
+    }
+  }, [habits])
 
   useEffect(() => {
     if (!showEmojiPicker) return
@@ -324,17 +334,7 @@ export default function HabitsPage() {
       )}
 
       {/* Stats bar */}
-      {habits.length > 0 && !loading && (() => {
-        // 일주일 날짜별 전체 달성률 집계
-        const weekSummary: { date: string; rate: number }[] = []
-        if (habits[0]?.weekHistory) {
-          habits[0].weekHistory.forEach((_, i) => {
-            const date = habits[0].weekHistory[i].date
-            const completedOnDay = habits.filter(h => h.weekHistory[i]?.completed).length
-            weekSummary.push({ date, rate: completedOnDay / habits.length })
-          })
-        }
-        return (
+      {habits.length > 0 && !loading && (
         <div
           className="mb-6 rounded-xl p-4"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
@@ -359,43 +359,87 @@ export default function HabitsPage() {
               🎉 오늘 모든 습관을 완료했습니다!
             </div>
           )}
-          {weekSummary.length > 0 && (
-            <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-dim)' }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs" style={{ color: 'var(--text-dim)' }}>주간 달성 현황</span>
-              </div>
-              <div className="flex items-end gap-1.5">
-                {weekSummary.map((day, i) => {
-                  const dayLabel = DAY_LABELS[parseISO(day.date).getDay()]
-                  const isCurrentDate = day.date === dateStr
-                  return (
-                    <div key={i} className="flex flex-col items-center gap-0.5 flex-1">
-                      <div
-                        className="w-full rounded-sm transition-colors"
-                        style={{
-                          height: 16,
-                          background: day.rate > 0
-                            ? `rgba(88,196,168,${0.2 + day.rate * 0.8})`
-                            : 'var(--bg-input)',
-                          outline: isCurrentDate ? '1px solid var(--accent)' : 'none',
-                        }}
-                        title={`${day.date}: ${Math.round(day.rate * 100)}%`}
-                      />
-                      <span
-                        className="text-[8px]"
-                        style={{ color: isCurrentDate ? 'var(--accent-light)' : 'var(--text-dim)', fontWeight: isCurrentDate ? 600 : 400 }}
-                      >
-                        {dayLabel}
-                      </span>
+          {/* GitHub-style 210-day heatmap */}
+          {habits[0]?.heatmapHistory && (() => {
+            // 날짜별 전체 달성률 집계 (210일)
+            const heatmapSummary = habits[0].heatmapHistory.map((_, i) => ({
+              date: habits[0].heatmapHistory[i].date,
+              rate: habits.filter(h => h.heatmapHistory?.[i]?.completed).length / habits.length,
+            }))
+            // ISO 요일 오프셋 (월=0 ... 일=6)
+            const startIsoDay = (parseISO(heatmapSummary[0].date).getDay() + 6) % 7
+            const ISO_LABELS = ['월', '화', '수', '목', '금', '토', '일']
+            return (
+              <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-dim)' }}>
+                <span className="text-xs mb-2 block" style={{ color: 'var(--text-dim)' }}>전체 달성 현황 (최근 30주)</span>
+                <div className="flex gap-1.5">
+                  {/* 요일 레이블 */}
+                  <div className="flex flex-col gap-0.5 flex-shrink-0" style={{ paddingTop: 0 }}>
+                    {ISO_LABELS.map(label => (
+                      <div key={label} style={{ width: 10, height: 11, fontSize: 8, lineHeight: '11px', color: 'var(--text-dim)', textAlign: 'right' }}>
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                  {/* 잔디 그리드 */}
+                  <div
+                    ref={heatmapScrollRef}
+                    className="overflow-x-auto"
+                    style={{ scrollbarWidth: 'none' }}
+                  >
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateRows: 'repeat(7, 11px)',
+                        gridAutoFlow: 'column',
+                        gap: 2,
+                      }}
+                    >
+                      {/* 시작 요일 맞춤 빈 칸 */}
+                      {Array.from({ length: startIsoDay }, (_, i) => (
+                        <div key={`pad-${i}`} style={{ width: 11, height: 11 }} />
+                      ))}
+                      {heatmapSummary.map((day) => {
+                        const level = day.rate === 0 ? 0
+                          : day.rate <= 0.25 ? 1
+                          : day.rate <= 0.5 ? 2
+                          : day.rate <= 0.75 ? 3
+                          : day.rate < 1 ? 4
+                          : 5
+                        const bg = level === 0 ? 'var(--bg-input)'
+                          : level === 1 ? 'rgba(88,196,168,0.2)'
+                          : level === 2 ? 'rgba(88,196,168,0.42)'
+                          : level === 3 ? 'rgba(88,196,168,0.62)'
+                          : level === 4 ? 'rgba(88,196,168,0.82)'
+                          : 'rgba(88,196,168,1)'
+                        return (
+                        <div
+                          key={day.date}
+                          onMouseEnter={(e) => setHeatmapTooltip({ date: day.date, rate: day.rate, x: e.clientX, y: e.clientY })}
+                          onMouseMove={(e) => setHeatmapTooltip(t => t ? { ...t, x: e.clientX, y: e.clientY } : t)}
+                          onMouseLeave={() => setHeatmapTooltip(null)}
+                          style={{
+                            width: 11,
+                            height: 11,
+                            borderRadius: 2,
+                            background: bg,
+                            outline: day.date === dateStr ? '1.5px solid var(--accent)' : 'none',
+                            flexShrink: 0,
+                            cursor: 'default',
+                            transition: 'filter 0.1s',
+                          }}
+                          className="hover:brightness-125"
+                        />
+                        )
+                      })}
                     </div>
-                  )
-                })}
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
         </div>
-        )
-      })()}
+      )}
 
       {/* Habit List */}
       {loading ? (
@@ -510,7 +554,34 @@ export default function HabitsPage() {
       )}
       </div>
 
-      {/* Delete Confirm Modal */}
+      {/* Heatmap Tooltip */}
+      {heatmapTooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: heatmapTooltip.x + 12,
+            top: heatmapTooltip.y - 36,
+            zIndex: 100,
+            pointerEvents: 'none',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            padding: '4px 8px',
+            fontSize: 11,
+            color: 'var(--text)',
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+        >
+          <span style={{ color: 'var(--text-muted)' }}>{heatmapTooltip.date}</span>
+          {' '}
+          <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>
+            {heatmapTooltip.rate === 0 ? '미달성' : `${Math.round(heatmapTooltip.rate * 100)}%`}
+          </span>
+        </div>
+      )}
+
+            {/* Delete Confirm Modal */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
