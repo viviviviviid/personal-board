@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
-import { format, subDays, addDays } from 'date-fns'
+import { format, subDays, addDays, parseISO } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { Plus, Check, X, Flame, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 
@@ -40,7 +40,7 @@ const COLOR_OPTIONS = [
   '#a858c4', '#58c4a8', '#c45878', '#7878c4',
 ]
 
-const WEEK_LABELS = ['월', '화', '수', '목', '금', '토', '일']
+const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
 
 export default function HabitsPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -324,7 +324,17 @@ export default function HabitsPage() {
       )}
 
       {/* Stats bar */}
-      {habits.length > 0 && !loading && (
+      {habits.length > 0 && !loading && (() => {
+        // 일주일 날짜별 전체 달성률 집계
+        const weekSummary: { date: string; rate: number }[] = []
+        if (habits[0]?.weekHistory) {
+          habits[0].weekHistory.forEach((_, i) => {
+            const date = habits[0].weekHistory[i].date
+            const completedOnDay = habits.filter(h => h.weekHistory[i]?.completed).length
+            weekSummary.push({ date, rate: completedOnDay / habits.length })
+          })
+        }
+        return (
         <div
           className="mb-6 rounded-xl p-4"
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
@@ -349,8 +359,43 @@ export default function HabitsPage() {
               🎉 오늘 모든 습관을 완료했습니다!
             </div>
           )}
+          {weekSummary.length > 0 && (
+            <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border-dim)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs" style={{ color: 'var(--text-dim)' }}>주간 달성 현황</span>
+              </div>
+              <div className="flex items-end gap-1.5">
+                {weekSummary.map((day, i) => {
+                  const dayLabel = DAY_LABELS[parseISO(day.date).getDay()]
+                  const isCurrentDate = day.date === dateStr
+                  return (
+                    <div key={i} className="flex flex-col items-center gap-0.5 flex-1">
+                      <div
+                        className="w-full rounded-sm transition-colors"
+                        style={{
+                          height: 16,
+                          background: day.rate > 0
+                            ? `rgba(88,196,168,${0.2 + day.rate * 0.8})`
+                            : 'var(--bg-input)',
+                          outline: isCurrentDate ? '1px solid var(--accent)' : 'none',
+                        }}
+                        title={`${day.date}: ${Math.round(day.rate * 100)}%`}
+                      />
+                      <span
+                        className="text-[8px]"
+                        style={{ color: isCurrentDate ? 'var(--accent-light)' : 'var(--text-dim)', fontWeight: isCurrentDate ? 600 : 400 }}
+                      >
+                        {dayLabel}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
-      )}
+        )
+      })()}
 
       {/* Habit List */}
       {loading ? (
@@ -440,7 +485,9 @@ export default function HabitsPage() {
                 {/* Week history */}
                 {habit.weekHistory && (
                   <div className="flex items-center gap-1.5 mt-2.5 pl-9">
-                    {habit.weekHistory.map((day, i) => (
+                    {habit.weekHistory.map((day, i) => {
+                      const dayLabel = DAY_LABELS[parseISO(day.date).getDay()]
+                      return (
                       <div key={i} className="flex flex-col items-center gap-0.5">
                         <div
                           className="w-4 h-4 rounded-sm transition-colors"
@@ -450,9 +497,10 @@ export default function HabitsPage() {
                           }}
                           title={day.date}
                         />
-                        <span className="text-[8px]" style={{ color: 'var(--text-dim)' }}>{WEEK_LABELS[i]}</span>
+                        <span className="text-[8px]" style={{ color: 'var(--text-dim)' }}>{dayLabel}</span>
                       </div>
-                    ))}
+                    )})}
+
                   </div>
                 )}
               </div>
