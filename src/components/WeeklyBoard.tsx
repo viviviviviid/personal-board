@@ -1759,11 +1759,11 @@ export default function WeeklyBoard() {
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-0">
                     {dayTodos.map(todo => (
                       <div
                         key={todo.id}
-                        className="flex items-start gap-1.5 group px-1.5 py-1.5 rounded-lg transition-colors"
+                        className="flex items-start gap-1 group px-1 py-0.5 rounded transition-colors"
                         style={{ cursor: 'default' }}
                         onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                         onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -1771,7 +1771,7 @@ export default function WeeklyBoard() {
                         {/* 체크박스 */}
                         <button
                           onClick={() => toggleTodo(todo.id, todo.completed)}
-                          className="w-4 h-4 rounded flex-shrink-0 flex items-center justify-center transition-all mt-0.5"
+                          className="w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center transition-all mt-px"
                           style={{
                             background: todo.completed ? 'var(--accent-dim)' : 'transparent',
                             border: `1.5px solid ${todo.completed ? 'var(--accent)' : 'var(--border)'}`,
