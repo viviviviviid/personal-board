@@ -156,6 +156,7 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
       ref={containerRef}
       style={{
         flex: 1,
+        minHeight: 0,
         overflow: 'hidden',
         display: 'flex',
         justifyContent: 'center',

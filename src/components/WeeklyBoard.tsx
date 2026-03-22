@@ -272,12 +272,13 @@ function EntryDetailPopover({ entry, anchorRect, onClose, onUpdated, onDeleted }
   const [saving, setSaving] = useState(false)
   const [recurringAction, setRecurringAction] = useState<'edit' | 'delete' | null>(null)
 
-  // 팝오버 위치: 오른쪽 공간 부족하면 왼쪽
+  // 팝오버 위치: 오른쪽 공간 부족하면 왼쪽, 화면 안으로 클램핑
   const popWidth = 220
-  const left = anchorRect.right + 8 + popWidth > window.innerWidth
+  const rawLeft = anchorRect.right + 8 + popWidth > window.innerWidth
     ? anchorRect.left - popWidth - 8
     : anchorRect.right + 8
-  const top = Math.min(anchorRect.top, window.innerHeight - 320)
+  const left = Math.max(8, Math.min(rawLeft, window.innerWidth - popWidth - 8))
+  const top = Math.max(8, Math.min(anchorRect.top, window.innerHeight - 320))
 
   const handleSave = async (mode: 'single' | 'all') => {
     setSaving(true)
@@ -1127,7 +1128,8 @@ export default function WeeklyBoard() {
     : `${format(currentMonth, 'yyyy.MM')} — ${format(addMonths(currentMonth, monthCount - 1), 'yyyy.MM')}`
   const nowY = nowToY(now)
   const gridCols = `44px repeat(7, minmax(0, 1fr))`
-  const visibleDays = isMobile ? weekDays.slice(mobileDay, Math.min(mobileDay + mobileDayCols, 7)) : weekDays
+  const mobileStart = isMobile ? Math.min(mobileDay, Math.max(0, 7 - mobileDayCols)) : 0
+  const visibleDays = isMobile ? weekDays.slice(mobileStart, mobileStart + mobileDayCols) : weekDays
   const mobileCols = `44px repeat(${visibleDays.length}, minmax(0, 1fr))`
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -1416,7 +1418,7 @@ export default function WeeklyBoard() {
           key={format(currentMonth, 'yyyy-MM')}
           className={monthSlideDir === 'next' ? 'week-slide-next' : monthSlideDir === 'prev' ? 'week-slide-prev' : ''}
           onAnimationEnd={() => setMonthSlideDir(null)}
-          style={{ flex: 1, minHeight: 0 }}
+          style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
         >
           <MonthlyCalendar
             currentMonth={currentMonth}
@@ -1439,7 +1441,7 @@ export default function WeeklyBoard() {
         <div className="flex gap-1 mb-3 overflow-x-auto flex-shrink-0">
           {weekDays.map((day, i) => {
             const today = isToday(day)
-            const isSelected = i >= mobileDay && i < mobileDay + mobileDayCols
+            const isSelected = i >= mobileStart && i < mobileStart + mobileDayCols
             return (
               <button
                 key={i}
@@ -2092,11 +2094,14 @@ export default function WeeklyBoard() {
 
                   // tooltip position (fixed) — read column rect at render time
                   const colRect = columnRefs.current[di]?.getBoundingClientRect()
-                  const tipTop = colRect ? colRect.top + formTopY : formTopY
-                  const flipLeft = di >= 5 // 오른쪽 끝 컬럼은 왼쪽에 표시
-                  const tipLeft = colRect
-                    ? flipLeft ? colRect.left - 192 : colRect.right + 4
+                  const tipW = 192
+                  const rawTipTop = colRect ? colRect.top + formTopY : formTopY
+                  const tipTop = Math.max(8, Math.min(rawTipTop, window.innerHeight - 300))
+                  const flipLeft = colRect ? colRect.right + 4 + tipW > window.innerWidth : di >= 5
+                  const rawTipLeft = colRect
+                    ? flipLeft ? colRect.left - tipW - 4 : colRect.right + 4
                     : 0
+                  const tipLeft = Math.max(8, Math.min(rawTipLeft, window.innerWidth - tipW - 8))
 
                   return (
                   <>
@@ -2182,7 +2187,7 @@ export default function WeeklyBoard() {
                         position: 'fixed',
                         top: tipTop,
                         left: tipLeft,
-                        width: 188,
+                        width: tipW,
                         zIndex: 9999,
                         background: 'var(--bg-card)',
                         border: '1px solid var(--border)',
