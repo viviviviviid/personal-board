@@ -1127,10 +1127,10 @@ export default function WeeklyBoard() {
     ? format(currentMonth, 'yyyy년 M월')
     : `${format(currentMonth, 'yyyy.MM')} — ${format(addMonths(currentMonth, monthCount - 1), 'yyyy.MM')}`
   const nowY = nowToY(now)
-  const gridCols = `44px repeat(7, minmax(0, 1fr))`
+  const gridCols = `32px repeat(7, minmax(0, 1fr))`
   const mobileStart = isMobile ? Math.min(mobileDay, Math.max(0, 7 - mobileDayCols)) : 0
   const visibleDays = isMobile ? weekDays.slice(mobileStart, mobileStart + mobileDayCols) : weekDays
-  const mobileCols = `44px repeat(${visibleDays.length}, minmax(0, 1fr))`
+  const mobileCols = `32px repeat(${visibleDays.length}, minmax(0, 1fr))`
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -1730,7 +1730,7 @@ export default function WeeklyBoard() {
             className="flex items-center justify-end pr-1.5"
             style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}
           >
-            <span className="text-[9px] tracking-widest font-semibold" style={{ color: 'var(--text-dim)' }}>TO-DO</span>
+            <span className="text-[9px] font-semibold leading-tight text-center" style={{ color: 'var(--text-dim)' }}>TO<br/>DO</span>
           </div>
           {visibleDays.map((day) => {
             const wi = weekDays.indexOf(day)
@@ -1958,7 +1958,7 @@ export default function WeeklyBoard() {
             {HOURS.map(hour => (
               <div
                 key={hour}
-                style={{ position: 'absolute', top: (hour - FIRST_HOUR) * ROW_H + 3, right: 6, color: 'var(--text-dim)' }}
+                style={{ position: 'absolute', top: (hour - FIRST_HOUR) * ROW_H + 3, right: 3, color: 'var(--text-dim)' }}
                 className="text-[10px] font-mono tabular-nums leading-none"
               >
                 {String(hour).padStart(2, '0')}
