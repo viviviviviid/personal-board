@@ -1632,12 +1632,12 @@ export default function WeeklyBoard() {
 
       {view === 'weekly' && <div
         key={currentWeekStart.toISOString()}
-        className={`flex-1 flex flex-col rounded-xl overflow-hidden${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
-        style={{ minWidth: 0, border: '1px solid var(--border)' }}
+        className={`flex-1 flex flex-col rounded-xl${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
+        style={{ minWidth: 0, border: '1px solid var(--border)', overflowX: 'hidden', overflowY: 'auto', scrollSnapType: 'y proximity' }}
         onAnimationEnd={() => setSlideDir(null)}
       >
         {/* ── 상단 고정: 헤더 + 하이라이트 + TO-DO ── */}
-        <div style={{ flexShrink: 0, overflowX: isMobile ? 'hidden' : 'auto' }}>
+        <div style={{ flexShrink: 0, overflowX: isMobile ? 'hidden' : 'auto', scrollSnapAlign: 'start' }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: isMobile ? mobileCols : gridCols,
@@ -1933,8 +1933,7 @@ export default function WeeklyBoard() {
         {/* ── 하단 독립 스크롤: 타임라인 ── */}
         <div
           ref={gridScrollRef}
-          className="flex-1 overflow-auto"
-          style={{ overscrollBehavior: 'contain' }}
+          style={{ flexShrink: 0, minHeight: '100%', overflowY: 'auto', scrollSnapAlign: 'start' }}
         >
         <div style={{
           display: 'grid',
