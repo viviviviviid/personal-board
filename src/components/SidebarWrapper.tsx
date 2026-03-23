@@ -21,6 +21,7 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
         marginLeft: isMobile ? 0 : isCollapsed ? 48 : 240,
         paddingBottom: isMobile ? 80 : 16,
         height: '100vh',
+        overflowY: 'auto',
         display: 'flex',
         flexDirection: 'column',
       }}
