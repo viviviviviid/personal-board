@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
     rangeEnd.setUTCHours(23, 59, 59, 999)
 
     const habits = await prisma.habit.findMany({
-      where: { userId: session.user.id },
+      where: {
+        userId: session.user.id,
+        createdAt: { lte: rangeEnd }, // 조회 날짜 이전에 생성된 습관만
+      },
       orderBy: { createdAt: 'asc' },
       include: {
         logs: {

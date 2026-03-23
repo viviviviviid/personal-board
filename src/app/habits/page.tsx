@@ -166,9 +166,9 @@ export default function HabitsPage() {
   )
 
   return (
-    <div {...swipeHandlers} style={{ minHeight: '100%' }}>
+    <div {...swipeHandlers} style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-6" style={{ flexShrink: 0 }}>
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-bright)' }}>
             <Flame style={{ color: 'var(--warning)' }} size={22} />
@@ -229,6 +229,7 @@ export default function HabitsPage() {
         key={dateStr}
         className={slideDir === 'next' ? 'week-slide-next' : slideDir === 'prev' ? 'week-slide-prev' : ''}
         onAnimationEnd={() => setSlideDir(null)}
+        style={{ flex: 1, overflowY: 'auto', paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
       >
 
       {error && (
