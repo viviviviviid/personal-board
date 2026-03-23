@@ -143,6 +143,7 @@ export default function AIPanel({
           </p>
         )
       }
+      if (line.trim() === '---') return <hr key={i} style={{ border: 'none', borderTop: '1px solid var(--border-dim)', margin: '8px 0' }} />
       if (line.trim() === '') return <div key={i} className="h-2" />
       return (
         <p key={i} className="text-sm mb-1.5" style={{ color: 'var(--text)' }}>
