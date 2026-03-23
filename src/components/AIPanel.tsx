@@ -103,20 +103,36 @@ export default function AIPanel({
     if (!results[next]) generate(next)
   }
 
+  // 인라인 **bold** 파싱
+  const renderInline = (text: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*)/)
+    if (parts.length === 1) return <>{text}</>
+    return (
+      <>
+        {parts.map((part, j) =>
+          part.startsWith('**') && part.endsWith('**')
+            ? <strong key={j} style={{ color: 'var(--text-bright)' }}>{part.slice(2, -2)}</strong>
+            : part
+        )}
+      </>
+    )
+  }
+
   const formatText = (text: string) =>
     text.split('\n').map((line, i) => {
       if (line.startsWith('## ')) {
         return (
           <h3 key={i} className="text-sm font-semibold mt-5 mb-2 first:mt-0" style={{ color: 'var(--accent-light)' }}>
-            {line.replace('## ', '')}
+            {line.replace(/^## /, '')}
           </h3>
         )
       }
-      if (line.startsWith('- ') || line.startsWith('• ')) {
+      if (/^[-•*] /.test(line)) {
+        const content = line.replace(/^[-•*] /, '')
         return (
           <div key={i} className="flex gap-2 text-sm mb-1.5" style={{ color: 'var(--text)' }}>
             <span style={{ color: 'var(--accent)' }} className="mt-0.5 flex-shrink-0">•</span>
-            <span>{line.replace(/^[-•] /, '')}</span>
+            <span>{renderInline(content)}</span>
           </div>
         )
       }
@@ -130,7 +146,7 @@ export default function AIPanel({
       if (line.trim() === '') return <div key={i} className="h-2" />
       return (
         <p key={i} className="text-sm mb-1.5" style={{ color: 'var(--text)' }}>
-          {line}
+          {renderInline(line)}
         </p>
       )
     })
