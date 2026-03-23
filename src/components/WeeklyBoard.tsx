@@ -1330,7 +1330,7 @@ export default function WeeklyBoard() {
             >
               <ChevronRight size={isMobile ? 18 : 15} />
             </button>
-            {!isMobile && view === 'weekly' && (
+            {view === 'weekly' && (
               <AIPanel
                 weekStart={currentWeekStart}
                 today={new Date()}
