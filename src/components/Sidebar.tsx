@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, FolderKanban, Flame, ChevronLeft, ChevronRight, LogOut, Settings } from 'lucide-react'
+import { CalendarDays, FolderKanban, Flame, NotebookPen, ChevronLeft, ChevronRight, LogOut, Settings } from 'lucide-react'
 import { useSidebar } from '@/context/SidebarContext'
 import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
@@ -13,6 +13,7 @@ const navItems = [
   { href: '/', label: '보드', sub: '할일 + 타임라인', icon: CalendarDays },
   { href: '/projects', label: '프로젝트', sub: '목표 관리', icon: FolderKanban },
   { href: '/habits', label: '습관 트래커', sub: '매일의 루틴', icon: Flame },
+  { href: '/notes', label: '메모', sub: '개인 노트', icon: NotebookPen },
 ]
 
 export default function Sidebar() {

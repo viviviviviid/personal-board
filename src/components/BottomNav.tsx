@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CalendarDays, FolderKanban, Flame, User } from 'lucide-react'
+import { CalendarDays, FolderKanban, Flame, NotebookPen, User } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
@@ -12,6 +12,7 @@ const navItems = [
   { href: '/', label: '보드', icon: CalendarDays },
   { href: '/projects', label: '프로젝트', icon: FolderKanban },
   { href: '/habits', label: '습관', icon: Flame },
+  { href: '/notes', label: '메모', icon: NotebookPen },
 ]
 
 export default function BottomNav() {

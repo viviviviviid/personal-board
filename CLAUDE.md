@@ -117,6 +117,15 @@ if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { st
 - WeeklyBoard에서 주간회고/일일브리핑 2탭, 프로젝트 상세에서 진단 단독 표시
 - AI 모델: Google Gemini, `GEMINI_API_KEY` / `GEMINI_MODEL` 환경변수로 설정
 
+### 메모 (Notes)
+- `Note` 모델: `userId`, `title?`, `content`(LongText), `tags?`(콤마 구분 문자열), `date?`(날짜 연결), `pinned`
+- API: `GET /api/notes?q=검색어&tag=태그` / `POST /api/notes` / `PATCH /api/notes/[id]` / `DELETE /api/notes/[id]`
+- PATCH/DELETE: Prisma P2025 에러 → 404 반환 (타인 노트 접근 차단)
+- 태그 유틸: `src/lib/noteUtils.ts` → `parseTags`, `sanitizeTag`(콤마 제거), `serializeTags`, `noteDisplayTitle`, `matchesSearch`
+- UI: `src/app/notes/page.tsx` — 데스크탑 2-column(목록+에디터), 모바일 전체화면 전환
+- 자동 저장 debounce 1.5초, 편집/미리보기 토글
+- `sanitizeTag()` 필수 — 콤마 포함 태그 입력 시 저장 포맷 깨짐 방지
+
 ### 테스트
 - Jest + ts-jest, 테스트 파일: `src/__tests__/lib/`
 - `npx jest` / `npm test`
@@ -124,4 +133,5 @@ if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { st
   - `recurring.ts`: generateDates (UTC 날짜 정확성 포함), createRecurringTodos, createRecurringTimelineEntries
   - `timelineDelete.test.ts`: single/future/all 삭제 모드 비즈니스 로직
   - `habitUtils.ts`, `timeUtils.ts`
+  - `notesUtils.test.ts`: parseTags, sanitizeTag, serializeTags, noteDisplayTitle, matchesSearch + 태그 통합 시나리오
 - Prisma는 `jest.fn()` mock 사용 (실제 DB 연결 불필요)
