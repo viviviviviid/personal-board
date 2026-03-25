@@ -34,13 +34,13 @@ export function randomSaltHex(): string {
 function bytesToB64(buf: Uint8Array): string {
   return btoa(String.fromCharCode(...buf))
 }
-function b64ToBytes(b64: string): Uint8Array {
-  return Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+function b64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0)) as Uint8Array<ArrayBuffer>
 }
-function hexToBytes(hex: string): Uint8Array {
+function hexToBytes(hex: string): Uint8Array<ArrayBuffer> {
   const arr = new Uint8Array(hex.length / 2)
   for (let i = 0; i < arr.length; i++) arr[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16)
-  return arr
+  return arr as Uint8Array<ArrayBuffer>
 }
 function bytesToHex(buf: Uint8Array): string {
   return Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('')
