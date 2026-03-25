@@ -24,6 +24,8 @@ model User {
   highlights    DailyHighlight[]
   recurringRules RecurringRule[]
   notes         Note[]
+  vaultConfig   VaultConfig?
+  credentials   Credential[]
 }
 
 model Account {
@@ -177,4 +179,29 @@ model Note {
 
   @@index([userId])
   @@index([userId, date])
+}
+
+model VaultConfig {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  salt      String
+  verifier  String   @db.LongText
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model Credential {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  type           String   @default("password")
+  encryptedValue String   @db.LongText
+  iv             String
+  description    String?
+  pinned         Boolean  @default(false)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
 }
