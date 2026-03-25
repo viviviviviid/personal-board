@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import SidebarWrapper from '@/components/SidebarWrapper'
 import BottomNav from '@/components/BottomNav'
 import { SidebarProvider } from '@/context/SidebarContext'
+import { VaultProvider } from '@/context/VaultContext'
 import SessionProviderWrapper from '@/components/SessionProviderWrapper'
 import PWARegister from '@/components/PWARegister'
 
@@ -43,6 +44,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full antialiased">
         <SessionProviderWrapper>
+          <VaultProvider>
           <SidebarProvider>
             {/* 데스크탑 사이드바 */}
             <Sidebar />
@@ -53,6 +55,7 @@ export default function RootLayout({
             {/* 모바일 하단 탭 */}
             <BottomNav />
           </SidebarProvider>
+          </VaultProvider>
         </SessionProviderWrapper>
       </body>
     </html>

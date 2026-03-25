@@ -1,5 +1,4 @@
 const ITERATIONS = 310000
-const SESSION_KEY = 'vault-session-key'
 
 export async function deriveKey(password: string, saltHex: string): Promise<CryptoKey> {
   const salt = hexToBytes(saltHex)
@@ -9,7 +8,7 @@ export async function deriveKey(password: string, saltHex: string): Promise<Cryp
     { name: 'PBKDF2', salt, iterations: ITERATIONS, hash: 'SHA-256' },
     keyMaterial,
     { name: 'AES-GCM', length: 256 },
-    true, // sessionStorage 저장을 위해 exportable
+    false, // 키는 JS로 추출 불가
     ['encrypt', 'decrypt']
   )
 }
@@ -30,30 +29,6 @@ export async function decryptText(key: CryptoKey, iv: string, ciphertext: string
 
 export function randomSaltHex(): string {
   return bytesToHex(crypto.getRandomValues(new Uint8Array(16)))
-}
-
-/** 잠금 해제 후 탭 세션 동안 키를 유지하기 위해 sessionStorage에 저장 */
-export async function saveKeyToSession(key: CryptoKey): Promise<void> {
-  const raw = await crypto.subtle.exportKey('raw', key)
-  sessionStorage.setItem(SESSION_KEY, bytesToB64(new Uint8Array(raw)))
-}
-
-/** 페이지 재방문 시 sessionStorage에서 키 복원 (탭 닫으면 자동 소멸) */
-export async function loadKeyFromSession(): Promise<CryptoKey | null> {
-  const b64 = sessionStorage.getItem(SESSION_KEY)
-  if (!b64) return null
-  try {
-    const raw = b64ToBytes(b64)
-    return await crypto.subtle.importKey('raw', raw, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt'])
-  } catch {
-    sessionStorage.removeItem(SESSION_KEY)
-    return null
-  }
-}
-
-/** 잠금 시 세션 키 삭제 */
-export function clearKeyFromSession(): void {
-  sessionStorage.removeItem(SESSION_KEY)
 }
 
 function bytesToB64(buf: Uint8Array): string {

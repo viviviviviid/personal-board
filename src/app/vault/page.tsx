@@ -4,8 +4,9 @@ import {
   Lock, Eye, EyeOff, Copy, Plus, Pin, Trash2,
   ChevronLeft, Check, Shield, Search, X, AlertTriangle,
 } from 'lucide-react'
-import { deriveKey, encryptText, decryptText, randomSaltHex, saveKeyToSession, loadKeyFromSession, clearKeyFromSession } from '@/lib/vaultCrypto'
+import { deriveKey, encryptText, decryptText, randomSaltHex } from '@/lib/vaultCrypto'
 import { VaultRow, VaultContent, newRowId, parseContent, serializeContent } from '@/lib/vaultContent'
+import { useVaultKey } from '@/context/VaultContext'
 
 interface Credential {
   id: string
@@ -36,8 +37,8 @@ function formatDate(iso: string): string {
 }
 
 export default function VaultPage() {
+  const { cryptoKey, setCryptoKey } = useVaultKey()
   const [status, setStatus] = useState<Status>('loading')
-  const [cryptoKey, setCryptoKey] = useState<CryptoKey | null>(null)
   const [saltHex, setSaltHex] = useState('')
   const [verifierJson, setVerifierJson] = useState('')
 
@@ -82,10 +83,8 @@ export default function VaultPage() {
         if (!data.exists) { setStatus('setup'); return }
         setSaltHex(data.salt)
         setVerifierJson(data.verifier)
-        // 세션에 키가 남아있으면 바로 언락
-        const sessionKey = await loadKeyFromSession()
-        if (sessionKey) {
-          setCryptoKey(sessionKey)
+        // Context에 키가 있으면 (같은 탭 내 페이지 이동 후 복귀) 바로 언락
+        if (cryptoKey) {
           await fetchCredentials()
           setStatus('unlocked')
         } else {
@@ -93,6 +92,8 @@ export default function VaultPage() {
         }
       })
       .catch(() => setStatus('setup'))
+  // cryptoKey는 의도적으로 deps 제외 — 마운트 시 1회만 체크
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCredentials])
 
   // ── 설정 ──
@@ -116,7 +117,6 @@ export default function VaultPage() {
         setSaltHex(salt)
         setVerifierJson(verifier)
         setCryptoKey(key)
-        await saveKeyToSession(key)
         await fetchCredentials()
         setStatus('unlocked')
         setPassword('')
@@ -142,7 +142,6 @@ export default function VaultPage() {
       const verified = await decryptText(key, iv, ciphertext)
       if (verified === 'vault-verified') {
         setCryptoKey(key)
-        await saveKeyToSession(key)
         await fetchCredentials()
         setStatus('unlocked')
         setPassword('')
@@ -157,7 +156,6 @@ export default function VaultPage() {
   }
 
   const handleLock = () => {
-    clearKeyFromSession()
     setCryptoKey(null)
     setCredentials([])
     setSelected(null)
