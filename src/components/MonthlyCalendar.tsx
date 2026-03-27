@@ -69,6 +69,7 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
   const [calEvents, setCalEvents] = useState<CalEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [cellSize, setCellSize] = useState(80)
+  const [containerWidth, setContainerWidth] = useState(800)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const months = useMemo(
@@ -91,6 +92,7 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
     if (!el) return
     const obs = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect
+      setContainerWidth(width)
       const perMonthW = (width - (monthCount - 1) * 12) / monthCount
       const fromW = Math.floor(perMonthW / 7)
       const fromH = Math.floor((height - HEADER_H) / maxNumWeeks)
@@ -169,6 +171,7 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
           key={mi}
           month={month}
           cellSize={cellSize}
+          containerWidth={containerWidth}
           todosForDay={todosForDay}
           timelineForDay={timelineForDay}
           calEventsForDay={calEventsForDay}
@@ -185,6 +188,7 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
 function MonthGrid({
   month,
   cellSize,
+  containerWidth,
   todosForDay,
   timelineForDay,
   calEventsForDay,
@@ -194,6 +198,7 @@ function MonthGrid({
 }: {
   month: Date
   cellSize: number
+  containerWidth: number
   todosForDay: (day: Date) => Todo[]
   timelineForDay: (day: Date) => TimelineEntry[]
   calEventsForDay: (day: Date) => CalEvent[]
@@ -245,7 +250,8 @@ function MonthGrid({
   const dateCircle = Math.max(16, Math.min(22, Math.round(cellSize * 0.31)))
   const todoFont = Math.max(8, Math.min(11, Math.round(cellSize * 0.14)))
   const dot = Math.max(4, Math.min(6, Math.round(cellSize * 0.08)))
-  const maxVisible = Math.max(1, Math.floor((cellSize - dateCircle - pad * 3) / (todoFont + 5)))
+  const isMobile = containerWidth < 640 || cellSize < 60
+  const maxVisible = isMobile ? 0 : 1
 
   return (
     <div
@@ -426,7 +432,7 @@ function MonthGrid({
                 {/* 더보기 */}
                 {overflow > 0 && (
                   <div style={{ fontSize: Math.max(8, todoFont - 1), color: 'var(--text-dim)', paddingLeft: pad }}>
-                    +{overflow} 더보기
+                    +{overflow}
                   </div>
                 )}
 

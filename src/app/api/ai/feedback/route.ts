@@ -10,7 +10,8 @@ export async function POST(request: NextRequest) {
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const body = await request.json()
-    const { weekStart } = body
+    const { weekStart, dataTypes: rawDataTypes } = body
+    const dataTypes: string[] = rawDataTypes ?? ['todos', 'timeline', 'habits', 'highlights']
 
     if (!weekStart) {
       return NextResponse.json({ error: '주 시작 날짜는 필수입니다.' }, { status: 400 })
@@ -21,40 +22,48 @@ export async function POST(request: NextRequest) {
     const userId = session.user.id
 
     const [todos, timeline, habits, highlights] = await Promise.all([
-      prisma.todo.findMany({
-        where: {
-          userId,
-          date: { gte: startOfDay(weekStartDate), lte: endOfDay(weekEndDate) },
-        },
-        select: { title: true, completed: true, date: true, priority: true, urgent: true },
-      }),
-      prisma.timelineEntry.findMany({
-        where: {
-          userId,
-          date: { gte: startOfDay(weekStartDate), lte: endOfDay(weekEndDate) },
-        },
-        select: { title: true, category: true, startTime: true, endTime: true, date: true },
-      }),
-      prisma.habit.findMany({
-        where: { userId },
-        include: {
-          logs: {
+      dataTypes.includes('todos')
+        ? prisma.todo.findMany({
             where: {
+              userId,
               date: { gte: startOfDay(weekStartDate), lte: endOfDay(weekEndDate) },
             },
-          },
-        },
-      }),
-      prisma.dailyHighlight.findMany({
-        where: {
-          userId,
-          date: {
-            gte: format(weekStartDate, 'yyyy-MM-dd'),
-            lte: format(weekEndDate, 'yyyy-MM-dd'),
-          },
-        },
-        select: { date: true, content: true, completed: true },
-      }),
+            select: { title: true, completed: true, date: true, priority: true, urgent: true },
+          })
+        : Promise.resolve([]),
+      dataTypes.includes('timeline')
+        ? prisma.timelineEntry.findMany({
+            where: {
+              userId,
+              date: { gte: startOfDay(weekStartDate), lte: endOfDay(weekEndDate) },
+            },
+            select: { title: true, category: true, startTime: true, endTime: true, date: true },
+          })
+        : Promise.resolve([]),
+      dataTypes.includes('habits')
+        ? prisma.habit.findMany({
+            where: { userId },
+            include: {
+              logs: {
+                where: {
+                  date: { gte: startOfDay(weekStartDate), lte: endOfDay(weekEndDate) },
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+      dataTypes.includes('highlights')
+        ? prisma.dailyHighlight.findMany({
+            where: {
+              userId,
+              date: {
+                gte: format(weekStartDate, 'yyyy-MM-dd'),
+                lte: format(weekEndDate, 'yyyy-MM-dd'),
+              },
+            },
+            select: { date: true, content: true, completed: true },
+          })
+        : Promise.resolve([]),
     ])
 
     if (!process.env.GEMINI_API_KEY) {
@@ -113,11 +122,19 @@ export async function POST(request: NextRequest) {
     const completedTodos = todos.filter((t) => t.completed).length
     const completionRate = totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0
 
+    const includedDataLabel = [
+      dataTypes.includes('todos') ? '투두' : null,
+      dataTypes.includes('timeline') ? '타임라인' : null,
+      dataTypes.includes('habits') ? '습관' : null,
+      dataTypes.includes('highlights') ? '데일리 하이라이트' : null,
+    ].filter(Boolean).join(', ')
+
     const prompt = `당신은 개인 생산성 코치입니다. 사용자의 이번 주 활동 데이터를 분석하고 한국어로 깊이 있는 피드백을 제공해 주세요.
+(포함된 데이터: ${includedDataLabel || '없음'})
 
 ## 이번 주 데이터 (${format(weekStartDate, 'yyyy년 MM월 dd일')} ~ ${format(weekEndDate, 'MM월 dd일')})
 
-### 할일 전체 완료율: ${completionRate}% (${completedTodos}/${totalTodos})
+${dataTypes.includes('todos') ? `### 할일 전체 완료율: ${completionRate}% (${completedTodos}/${totalTodos})
 
 ### 우선순위별 완료율:
 ${byPriority.join(' | ')}
@@ -126,16 +143,16 @@ ${byPriority.join(' | ')}
 - 긴급+중요 (즉시 처리): ${matrix.q1}개
 - 중요+여유 (계획적 처리): ${matrix.q2}개
 - 긴급+덜중요 (위임 고려): ${matrix.q3}개
-- 여유+덜중요 (제거 고려): ${matrix.q4}개
+- 여유+덜중요 (제거 고려): ${matrix.q4}개` : '(할일 데이터 미포함)'}
 
-### 시간 투자 분포 (타임라인 기준):
-${timeSummary || '(타임라인 기록 없음)'}
+${dataTypes.includes('timeline') ? `### 시간 투자 분포 (타임라인 기준):
+${timeSummary || '(타임라인 기록 없음)'}` : '(타임라인 데이터 미포함)'}
 
-### 습관 트래커:
-${habitSummary || '(습관 없음)'}
+${dataTypes.includes('habits') ? `### 습관 트래커:
+${habitSummary || '(습관 없음)'}` : '(습관 데이터 미포함)'}
 
-### 데일리 하이라이트 (핵심 목표):
-${highlightSummary}
+${dataTypes.includes('highlights') ? `### 데일리 하이라이트 (핵심 목표):
+${highlightSummary}` : '(데일리 하이라이트 미포함)'}
 
 위 데이터를 바탕으로 다음 형식으로 피드백을 작성해 주세요:
 

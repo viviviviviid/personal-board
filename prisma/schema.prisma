@@ -26,6 +26,7 @@ model User {
   notes         Note[]
   vaultConfig   VaultConfig?
   credentials   Credential[]
+  aiFeedbackCaches AiFeedbackCache[]
 }
 
 model Account {
@@ -203,5 +204,18 @@ model Credential {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  @@index([userId])
+}
+
+model AiFeedbackCache {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String
+  feedback  String   @db.LongText
+  dataTypes String   @db.Text
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
   @@index([userId])
 }

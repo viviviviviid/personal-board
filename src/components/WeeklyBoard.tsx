@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday, addMonths, subMonths, startOfMonth } from 'date-fns'
-import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink, AlertCircle, Pencil } from 'lucide-react'
 import { signIn } from 'next-auth/react'
 import AIPanel from './AIPanel'
 import MonthlyCalendar from './MonthlyCalendar'
@@ -548,6 +548,8 @@ export default function WeeklyBoard() {
   const [addingTodoDay, setAddingTodoDay] = useState<string | null>(null)
   const [highlightOpenDay, setHighlightOpenDay] = useState<string | null>(null)
   const [newTodoTitle, setNewTodoTitle] = useState('')
+  const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
+  const [editingTodoTitle, setEditingTodoTitle] = useState('')
   const [selectedEntry, setSelectedEntry] = useState<{ entry: TimelineEntry; rect: DOMRect } | null>(null)
   const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number; startTime?: string } | null>(null)
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
@@ -733,6 +735,10 @@ export default function WeeklyBoard() {
     const DEFAULT_HOUR = 9
     const defaultY = (DEFAULT_HOUR - FIRST_HOUR) * ROW_H  // 9시 = 208px
 
+    // 현재 시간이 이번 주에 보이는지 확인
+    const todayInWeek = weekDays.some(d => isToday(d))
+    const currentNowY = nowToY(now)
+
     // 모바일: 선택된 날짜, 데스크탑: 주 첫날 기준
     const targetDay = isMobile ? weekDays[mobileDay] : weekDays[0]
     const dayEntries = timeline
@@ -740,7 +746,10 @@ export default function WeeklyBoard() {
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
 
     let scrollY: number
-    if (dayEntries.length > 0) {
+    // 오늘이 현재 주에 표시 중이고 현재 시간 위치를 계산할 수 있으면 현재 시간으로 스크롤
+    if (todayInWeek && currentNowY !== null) {
+      scrollY = Math.max(0, currentNowY - 100)
+    } else if (dayEntries.length > 0) {
       const [h, m] = dayEntries[0].startTime.split(':').map(Number)
       const entryY = (h - FIRST_HOUR) * ROW_H + (m / 60) * ROW_H
       // 이벤트 위에 여백 확보, 최소 0, 최대는 브라우저가 자연히 클램프
@@ -918,6 +927,23 @@ export default function WeeklyBoard() {
       setTodos(prev => prev.filter(t => t.id !== id))
     }
     await fetch(`/api/todos/${id}`, { method: 'DELETE' }).catch(() => fetchData())
+  }
+
+  const startEditTodo = (todo: Todo) => {
+    setEditingTodoId(todo.id)
+    setEditingTodoTitle(todo.title)
+  }
+
+  const commitEditTodo = async (todo: Todo) => {
+    const newTitle = editingTodoTitle.trim()
+    setEditingTodoId(null)
+    if (!newTitle || newTitle === todo.title) return
+    await fetch(`/api/todos/${todo.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: newTitle }),
+    })
+    setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, title: newTitle } : t))
   }
 
   const submitTodo = async (day: Date) => {
@@ -1801,13 +1827,52 @@ export default function WeeklyBoard() {
                             }}
                           />
                         )}
-                        <span
-                          className="text-[12px] leading-snug flex-1 min-w-0 break-words"
-                          style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
+                        {editingTodoId === todo.id ? (
+                          <input
+                            autoFocus
+                            value={editingTodoTitle}
+                            onChange={e => setEditingTodoTitle(e.target.value)}
+                            onKeyDown={e => {
+                              e.stopPropagation()
+                              if (e.key === 'Enter' && !e.nativeEvent.isComposing) commitEditTodo(todo)
+                              if (e.key === 'Escape') setEditingTodoId(null)
+                            }}
+                            onBlur={() => commitEditTodo(todo)}
+                            onClick={e => e.stopPropagation()}
+                            className="text-[12px] flex-1 min-w-0 focus:outline-none"
+                            style={{
+                              background: 'transparent',
+                              borderBottom: '1px solid var(--accent)',
+                              color: 'var(--text)',
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className="text-[12px] leading-snug flex-1 min-w-0 break-words"
+                            style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
+                          >
+                            {todo.recurringRuleId && <span style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }}>🔁</span>}
+                            {todo.title}
+                          </span>
+                        )}
+                        {/* 수정 버튼 */}
+                        <button
+                          onClick={e => { e.stopPropagation(); startEditTodo(todo) }}
+                          className={`flex-shrink-0 p-0.5 rounded transition-all ${isMobile ? 'opacity-40' : 'opacity-0 group-hover:opacity-60'}`}
+                          style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
+                          title="수정"
+                          onMouseEnter={e => {
+                            e.currentTarget.style.color = 'var(--accent-light)'
+                            e.currentTarget.style.background = 'var(--accent-dim)'
+                            e.currentTarget.style.opacity = '1'
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.color = 'var(--text-dim)'
+                            e.currentTarget.style.background = 'transparent'
+                          }}
                         >
-                          {todo.recurringRuleId && <span style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }}>🔁</span>}
-                          {todo.title}
-                        </span>
+                          <Pencil size={11} />
+                        </button>
                         {/* 긴급 버튼 */}
                         <button
                           onClick={() => toggleUrgent(todo.id, todo.urgent)}

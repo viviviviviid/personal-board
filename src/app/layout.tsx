@@ -6,8 +6,10 @@ import SidebarWrapper from '@/components/SidebarWrapper'
 import BottomNav from '@/components/BottomNav'
 import { SidebarProvider } from '@/context/SidebarContext'
 import { VaultProvider } from '@/context/VaultContext'
+import { AutoFeedbackProvider } from '@/context/AutoFeedbackContext'
 import SessionProviderWrapper from '@/components/SessionProviderWrapper'
 import PWARegister from '@/components/PWARegister'
+import AutoFeedbackTrigger from '@/components/AutoFeedbackTrigger'
 
 const caveat = Caveat({
   subsets: ['latin'],
@@ -44,6 +46,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full antialiased">
         <SessionProviderWrapper>
+          <AutoFeedbackProvider>
           <VaultProvider>
           <SidebarProvider>
             {/* 데스크탑 사이드바 */}
@@ -54,8 +57,10 @@ export default function RootLayout({
             </SidebarWrapper>
             {/* 모바일 하단 탭 */}
             <BottomNav />
+            <AutoFeedbackTrigger />
           </SidebarProvider>
           </VaultProvider>
+          </AutoFeedbackProvider>
         </SessionProviderWrapper>
       </body>
     </html>

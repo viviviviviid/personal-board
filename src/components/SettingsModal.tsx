@@ -20,6 +20,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [defaultView, setDefaultView] = useState<'weekly' | 'monthly'>('weekly')
   const [weekStart, setWeekStart] = useState<'mon' | 'sun'>('mon')
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [autoFeedback, setAutoFeedback] = useState(false)
+  const [feedbackDataTypes, setFeedbackDataTypes] = useState<string[]>(['todos', 'timeline', 'habits', 'highlights'])
 
   useEffect(() => {
     if (!isOpen) return
@@ -30,6 +32,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     if (ws === 'mon' || ws === 'sun') setWeekStart(ws)
     const t = localStorage.getItem('theme')
     setTheme(t === 'light' ? 'light' : 'dark')
+    setAutoFeedback(localStorage.getItem('ai-auto-feedback') === 'true')
+    const stored = localStorage.getItem('ai-feedback-data-types')
+    if (stored) setFeedbackDataTypes(JSON.parse(stored))
     // 캘린더 상태 확인
     setCalStatus('loading')
     fetch('/api/google-calendar/list')
@@ -62,6 +67,20 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setTheme(next)
     localStorage.setItem('theme', next)
     document.documentElement.setAttribute('data-theme', next)
+  }
+
+  const handleAutoFeedbackToggle = () => {
+    const next = !autoFeedback
+    setAutoFeedback(next)
+    localStorage.setItem('ai-auto-feedback', next ? 'true' : 'false')
+  }
+
+  const handleDataTypeToggle = (type: string) => {
+    const next = feedbackDataTypes.includes(type)
+      ? feedbackDataTypes.filter(t => t !== type)
+      : [...feedbackDataTypes, type]
+    setFeedbackDataTypes(next)
+    localStorage.setItem('ai-feedback-data-types', JSON.stringify(next))
   }
 
   if (!isOpen) return null
@@ -240,6 +259,71 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* ── 구분선 ── */}
+          <div className="my-5" style={{ borderTop: '1px solid var(--border-dim)' }} />
+
+          {/* ── AI 피드백 ── */}
+          <p className="text-[10px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--text-dim)' }}>AI 피드백</p>
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ border: '1px solid var(--border)' }}
+          >
+            {/* 자동 피드백 토글 */}
+            <div className="px-4 py-3" style={{ background: 'var(--bg-card)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm" style={{ color: 'var(--text)' }}>자동 피드백</span>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>오늘 처음 방문 시 지난 7일 피드백을 자동 생성합니다</p>
+                </div>
+                <button
+                  onClick={handleAutoFeedbackToggle}
+                  className="relative flex-shrink-0 w-10 h-5 rounded-full transition-colors"
+                  style={{
+                    background: autoFeedback ? 'var(--accent)' : 'var(--bg-input)',
+                    border: '1px solid var(--border)',
+                  }}
+                >
+                  <span
+                    className="absolute top-0.5 w-4 h-4 rounded-full transition-transform"
+                    style={{
+                      background: autoFeedback ? '#fff' : 'var(--text-dim)',
+                      left: autoFeedback ? '20px' : '2px',
+                    }}
+                  />
+                </button>
+              </div>
+            </div>
+
+            {/* 포함할 데이터 (자동 피드백 활성화 시만 표시) */}
+            {autoFeedback && (
+              <>
+                <div style={{ borderTop: '1px solid var(--border-dim)' }} />
+                <div className="px-4 py-3" style={{ background: 'var(--bg-card)' }}>
+                  <p className="text-xs mb-2 font-medium" style={{ color: 'var(--text-muted)' }}>포함할 데이터:</p>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { key: 'todos', label: '투두' },
+                      { key: 'timeline', label: '타임라인' },
+                      { key: 'habits', label: '습관' },
+                      { key: 'highlights', label: '데일리 하이라이트' },
+                    ].map(({ key, label }) => (
+                      <label key={key} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={feedbackDataTypes.includes(key)}
+                          onChange={() => handleDataTypeToggle(key)}
+                          className="w-3.5 h-3.5 rounded"
+                          style={{ accentColor: 'var(--accent)' }}
+                        />
+                        <span className="text-sm" style={{ color: 'var(--text)' }}>{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── 로그아웃 ── */}
