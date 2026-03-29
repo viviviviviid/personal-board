@@ -2053,17 +2053,18 @@ export default function WeeklyBoard() {
           {visibleDays.some(day => allDayGoogleEventsForDay(day).length > 0) && (
             <>
               <div
-                style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '2px solid var(--border-rule)', minHeight: 28 }}
-                className="flex items-center justify-end pr-1"
+                style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-rule)', minHeight: 28 }}
+                className="flex items-center gap-2 px-3"
               >
-                <span className="text-[8px] opacity-40" style={{ color: 'var(--text-dim)' }}>종일</span>
+                <div className="w-1 h-1 rounded-full" style={{ background: 'var(--accent-dim)' }} />
+                <span className="text-[9px] tracking-[0.2em] font-semibold uppercase" style={{ color: 'var(--text-dim)' }}>종일</span>
               </div>
               {visibleDays.map(day => {
                 const events = allDayGoogleEventsForDay(day)
                 return (
                   <div
                     key={format(day, 'yyyy-MM-dd') + '-allday'}
-                    style={{ background: 'var(--bg-surface)', borderBottom: '2px solid var(--border-rule)', borderRight: '1px solid var(--border-dim)', minHeight: 28, padding: '3px 4px' }}
+                    style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-rule)', borderRight: '1px solid var(--border-dim)', minHeight: 28, padding: '3px 4px' }}
                     className="flex flex-col gap-0.5"
                   >
                     {events.map(e => (
