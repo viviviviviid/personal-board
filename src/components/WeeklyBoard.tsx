@@ -2053,7 +2053,7 @@ export default function WeeklyBoard() {
           {visibleDays.some(day => allDayGoogleEventsForDay(day).length > 0) && (
             <>
               <div
-                style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', minHeight: 28 }}
+                style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '2px solid var(--border-rule)', minHeight: 28 }}
                 className="flex items-center justify-end pr-1"
               >
                 <span className="text-[8px] opacity-40" style={{ color: 'var(--text-dim)' }}>종일</span>
@@ -2063,7 +2063,7 @@ export default function WeeklyBoard() {
                 return (
                   <div
                     key={format(day, 'yyyy-MM-dd') + '-allday'}
-                    style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-dim)', borderRight: '1px solid var(--border-dim)', minHeight: 28, padding: '3px 4px' }}
+                    style={{ background: 'var(--bg-surface)', borderBottom: '2px solid var(--border-rule)', borderRight: '1px solid var(--border-dim)', minHeight: 28, padding: '3px 4px' }}
                     className="flex flex-col gap-0.5"
                   >
                     {events.map(e => (
