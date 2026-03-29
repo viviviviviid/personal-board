@@ -17,7 +17,7 @@ function calcIsMobile(containerWidth: number, cellSize: number): boolean {
 }
 
 function calcMaxVisible(isMobile: boolean): number {
-  return isMobile ? 0 : 1
+  return isMobile ? 0 : 3
 }
 
 interface SlotResult {
@@ -85,8 +85,8 @@ describe('calcMaxVisible', () => {
     expect(calcMaxVisible(true)).toBe(0)
   })
 
-  test('데스크탑이면 maxVisible = 1', () => {
-    expect(calcMaxVisible(false)).toBe(1)
+  test('데스크탑이면 maxVisible = 3', () => {
+    expect(calcMaxVisible(false)).toBe(3)
   })
 })
 
@@ -118,10 +118,10 @@ describe('calcSlots - 모바일 (maxVisible=0)', () => {
   })
 })
 
-// ── 슬롯 배분 및 오버플로우 계산 (maxVisible = 1, 데스크탑) ──────────────────
+// ── 슬롯 배분 및 오버플로우 계산 (maxVisible = 3, 데스크탑) ──────────────────
 
-describe('calcSlots - 데스크탑 (maxVisible=1)', () => {
-  const MAX = 1
+describe('calcSlots - 데스크탑 (maxVisible=3)', () => {
+  const MAX = 3
 
   test('항목 없으면 모두 0', () => {
     const r = calcSlots(0, 0, 0, MAX)
@@ -134,53 +134,56 @@ describe('calcSlots - 데스크탑 (maxVisible=1)', () => {
   test('todo 1개만 → 1 표시, overflow 0', () => {
     const r = calcSlots(1, 0, 0, MAX)
     expect(r.todosVisible).toBe(1)
-    expect(r.timelineVisible).toBe(0)
-    expect(r.calVisible).toBe(0)
     expect(r.overflow).toBe(0)
   })
 
-  test('todo 0 + timeline 1 → timeline 1 표시, overflow 0', () => {
-    // todo 없으면 슬롯이 timeline으로 넘어감
-    const r = calcSlots(0, 1, 0, MAX)
-    expect(r.todosVisible).toBe(0)
+  test('todo 3개 → 3 표시, overflow 0', () => {
+    const r = calcSlots(3, 0, 0, MAX)
+    expect(r.todosVisible).toBe(3)
+    expect(r.overflow).toBe(0)
+  })
+
+  test('todo 4개 → 3 표시, overflow 1', () => {
+    const r = calcSlots(4, 0, 0, MAX)
+    expect(r.todosVisible).toBe(3)
+    expect(r.overflow).toBe(1)
+  })
+
+  test('todo 1 + timeline 1 + cal 1 → 각 1개씩 3 표시, overflow 0', () => {
+    const r = calcSlots(1, 1, 1, MAX)
+    expect(r.todosVisible).toBe(1)
     expect(r.timelineVisible).toBe(1)
-    expect(r.calVisible).toBe(0)
-    expect(r.overflow).toBe(0)
-  })
-
-  test('todo 0 + timeline 0 + cal 1 → cal 1 표시, overflow 0', () => {
-    const r = calcSlots(0, 0, 1, MAX)
     expect(r.calVisible).toBe(1)
     expect(r.overflow).toBe(0)
   })
 
-  test('todo 1 + timeline 1 → todo가 슬롯 차지, timeline overflow', () => {
-    const r = calcSlots(1, 1, 0, MAX)
-    expect(r.todosVisible).toBe(1)
-    expect(r.timelineVisible).toBe(0)
-    expect(r.overflow).toBe(1)
-  })
-
-  test('todo 2 → 1 표시, 1 overflow', () => {
-    const r = calcSlots(2, 0, 0, MAX)
-    expect(r.todosVisible).toBe(1)
-    expect(r.overflow).toBe(1)
-  })
-
-  test('todo 0 + timeline 2 + cal 3 → timeline 1 표시, 나머지 overflow', () => {
-    const r = calcSlots(0, 2, 3, MAX)
-    expect(r.todosVisible).toBe(0)
+  test('todo 2 + timeline 2 → 2+1 표시, overflow 1', () => {
+    const r = calcSlots(2, 2, 0, MAX)
+    expect(r.todosVisible).toBe(2)
     expect(r.timelineVisible).toBe(1)
-    expect(r.calVisible).toBe(0)
-    expect(r.overflow).toBe(4)
+    expect(r.overflow).toBe(1)
   })
 
-  test('todo 3 + timeline 2 + cal 1 → overflow = 5', () => {
+  test('todo 0 + timeline 3 + cal 2 → timeline 3 표시, cal overflow', () => {
+    const r = calcSlots(0, 3, 2, MAX)
+    expect(r.todosVisible).toBe(0)
+    expect(r.timelineVisible).toBe(3)
+    expect(r.calVisible).toBe(0)
+    expect(r.overflow).toBe(2)
+  })
+
+  test('todo 3 + timeline 2 + cal 1 → todo 3 표시, 나머지 overflow = 3', () => {
     const r = calcSlots(3, 2, 1, MAX)
-    expect(r.todosVisible).toBe(1)
+    expect(r.todosVisible).toBe(3)
     expect(r.timelineVisible).toBe(0)
     expect(r.calVisible).toBe(0)
-    expect(r.overflow).toBe(5)
+    expect(r.overflow).toBe(3)
+  })
+
+  test('todo 0 + timeline 0 + cal 5 → cal 3 표시, overflow 2', () => {
+    const r = calcSlots(0, 0, 5, MAX)
+    expect(r.calVisible).toBe(3)
+    expect(r.overflow).toBe(2)
   })
 })
 
@@ -202,7 +205,7 @@ describe('모바일 vs 데스크탑 overflow 비교', () => {
 
   test('항목 없으면 모바일/데스크탑 모두 overflow 0', () => {
     expect(calcSlots(0, 0, 0, 0).overflow).toBe(0)
-    expect(calcSlots(0, 0, 0, 1).overflow).toBe(0)
+    expect(calcSlots(0, 0, 0, 3).overflow).toBe(0)
   })
 
   test('데스크탑에서 todo 1개만 있으면 overflow 없이 1 표시', () => {

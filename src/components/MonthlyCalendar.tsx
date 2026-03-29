@@ -28,10 +28,11 @@ interface Todo {
 interface CalEvent {
   id: string
   summary?: string
-  start: { dateTime: string }
-  end: { dateTime: string }
+  start: { dateTime?: string; date?: string }
+  end: { dateTime?: string; date?: string }
   calendarId: string
   calendarColor: string
+  allDay?: boolean
 }
 
 interface CalendarItem {
@@ -150,8 +151,23 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
     todos.filter(t => t.date && isSameDay(new Date(t.date), day))
   const timelineForDay = (day: Date) =>
     timeline.filter(e => !e.hideFromMonthly && isSameDay(new Date(e.date), day))
-  const calEventsForDay = (day: Date) =>
-    calEvents.filter(e => isSameDay(new Date(e.start.dateTime), day))
+  const calEventsForDay = (day: Date) => {
+    const dayStr = format(day, 'yyyy-MM-dd')
+    return calEvents.filter(e => {
+      if (e.allDay) {
+        // 종일 이벤트: end.date는 exclusive (Google Calendar 규칙)
+        return !!e.start.date && !!e.end.date && e.start.date <= dayStr && dayStr < e.end.date
+      }
+      // 시간 지정 이벤트: 해당 날짜와 겹치는지 확인
+      if (!e.start.dateTime) return false
+      const startDay = format(new Date(e.start.dateTime), 'yyyy-MM-dd')
+      const endDt = new Date(e.end.dateTime!)
+      const endDay = endDt.getHours() === 0 && endDt.getMinutes() === 0
+        ? format(addDays(endDt, -1), 'yyyy-MM-dd')
+        : format(endDt, 'yyyy-MM-dd')
+      return startDay <= dayStr && dayStr <= endDay
+    })
+  }
 
   return (
     <div
@@ -251,7 +267,7 @@ function MonthGrid({
   const todoFont = Math.max(8, Math.min(11, Math.round(cellSize * 0.14)))
   const dot = Math.max(4, Math.min(6, Math.round(cellSize * 0.08)))
   const isMobile = containerWidth < 640 || cellSize < 60
-  const maxVisible = isMobile ? 0 : 1
+  const maxVisible = isMobile ? 0 : 3
 
   return (
     <div

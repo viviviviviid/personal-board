@@ -476,9 +476,26 @@ function EntryDetailPopover({ entry, anchorRect, onClose, onUpdated, onDeleted }
 }
 
 // ── Google Event block ──────────────────────────────────────────────────────
-function GoogleEventBlock({ event, layoutCol = 0, layoutTotal = 1 }: { event: GoogleCalendarEvent; layoutCol?: number; layoutTotal?: number }) {
-  const startTime = format(new Date(event.start.dateTime!), 'HH:mm')
-  const endTime = format(new Date(event.end.dateTime!), 'HH:mm')
+// 멀티데이 timed 이벤트를 해당 날짜 범위로 클리핑
+function clipTimedEvent(event: GoogleCalendarEvent, day: Date): { startTime: string; endTime: string } {
+  const dayStr = format(day, 'yyyy-MM-dd')
+  const evStart = new Date(event.start.dateTime!)
+  const evEnd = new Date(event.end.dateTime!)
+  const startTime = format(evStart, 'yyyy-MM-dd') === dayStr
+    ? format(evStart, 'HH:mm')
+    : `${String(FIRST_HOUR).padStart(2, '0')}:00`
+  const endTime = format(evEnd, 'yyyy-MM-dd') === dayStr
+    ? format(evEnd, 'HH:mm')
+    : `${String(LAST_HOUR).padStart(2, '0')}:59`
+  return { startTime, endTime }
+}
+
+function GoogleEventBlock({ event, layoutCol = 0, layoutTotal = 1, effectiveStart, effectiveEnd }: {
+  event: GoogleCalendarEvent; layoutCol?: number; layoutTotal?: number;
+  effectiveStart?: string; effectiveEnd?: string;
+}) {
+  const startTime = effectiveStart ?? format(new Date(event.start.dateTime!), 'HH:mm')
+  const endTime = effectiveEnd ?? format(new Date(event.end.dateTime!), 'HH:mm')
   const top = timeToY(startTime)
   const height = Math.max(20, timeToY(endTime) - top)
   const color = event.calendarColor ?? '#4285F4'
@@ -1147,10 +1164,22 @@ export default function WeeklyBoard() {
     todos.filter(t => t.date && isSameDay(new Date(t.date), day))
   const entriesForDay = (day: Date) =>
     timeline.filter(e => isSameDay(new Date(e.date), day))
-  const googleEventsForDay = (day: Date) =>
-    googleEvents.filter(e => !e.allDay && isSameDay(new Date(e.start.dateTime!), day))
-  const allDayGoogleEventsForDay = (day: Date) =>
-    googleEvents.filter(e => e.allDay && isSameDay(new Date(e.start.date!), day))
+  const googleEventsForDay = (day: Date) => {
+    const dayStr = format(day, 'yyyy-MM-dd')
+    return googleEvents.filter(e => {
+      if (e.allDay) return false
+      const startDay = format(new Date(e.start.dateTime!), 'yyyy-MM-dd')
+      const endDt = new Date(e.end.dateTime!)
+      const endDay = endDt.getHours() === 0 && endDt.getMinutes() === 0
+        ? format(addDays(endDt, -1), 'yyyy-MM-dd')
+        : format(endDt, 'yyyy-MM-dd')
+      return startDay <= dayStr && dayStr <= endDay
+    })
+  }
+  const allDayGoogleEventsForDay = (day: Date) => {
+    const dayStr = format(day, 'yyyy-MM-dd')
+    return googleEvents.filter(e => e.allDay && !!e.start.date && !!e.end.date && e.start.date <= dayStr && dayStr < e.end.date)
+  }
   const weekLabel = `${format(currentWeekStart, 'yyyy.MM.dd')} — ${format(addDays(currentWeekStart, 6), 'MM.dd')}`
   const monthLabel = monthCount === 1
     ? format(currentMonth, 'yyyy년 M월')
@@ -2078,7 +2107,7 @@ export default function WeeklyBoard() {
             // 겹치는 항목 레이아웃 계산 (로컬 + 구글 통합)
             const layoutItems = [
               ...dayEntries.map(e => ({ id: e.id, start: e.startTime, end: e.endTime || addOneHour(e.startTime) })),
-              ...dayGoogleEvents.map(e => ({ id: `g_${e.id}`, start: format(new Date(e.start.dateTime!), 'HH:mm'), end: format(new Date(e.end.dateTime!), 'HH:mm') })),
+              ...dayGoogleEvents.map(e => { const c = clipTimedEvent(e, day); return { id: `g_${e.id}`, start: c.startTime, end: c.endTime } }),
             ]
             const layout = computeOverlapLayout(layoutItems)
 
@@ -2162,7 +2191,8 @@ export default function WeeklyBoard() {
                 {/* Google Calendar Events */}
                 {dayGoogleEvents.map(event => {
                   const lv = layout.get(`g_${event.id}`)
-                  return <GoogleEventBlock key={event.id} event={event} layoutCol={lv?.col} layoutTotal={lv?.total} />
+                  const { startTime, endTime } = clipTimedEvent(event, day)
+                  return <GoogleEventBlock key={event.id} event={event} layoutCol={lv?.col} layoutTotal={lv?.total} effectiveStart={startTime} effectiveEnd={endTime} />
                 })}
 
                 {/* Entries */}
