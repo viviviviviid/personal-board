@@ -440,7 +440,7 @@ function MonthGrid({
                       }}
                     />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                      {format(new Date(event.start.dateTime), 'H:mm')} {event.summary ?? '(제목 없음)'}
+                      {event.start.dateTime ? `${format(new Date(event.start.dateTime), 'H:mm')} ` : ''}{event.summary ?? '(제목 없음)'}
                     </span>
                   </div>
                 ))}
