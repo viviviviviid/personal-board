@@ -179,13 +179,19 @@ body {
   margin-top: 2px;
 }
 
-.note-editor-content ul,
+.note-editor-content ul {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin: 4px 0;
+}
 .note-editor-content ol {
+  list-style-type: decimal;
   padding-left: 1.5em;
   margin: 4px 0;
 }
 .note-editor-content li {
   margin: 2px 0;
+  display: list-item;
 }
 .note-editor-content ul > li::marker {
   color: var(--accent-light);
@@ -195,7 +201,13 @@ body {
 }
 
 /* 중첩 리스트 */
-.note-editor-content ul ul,
+.note-editor-content ul ul {
+  list-style-type: circle;
+  margin: 2px 0;
+}
+.note-editor-content ul ul ul {
+  list-style-type: square;
+}
 .note-editor-content ol ol,
 .note-editor-content ul ol,
 .note-editor-content ol ul {
