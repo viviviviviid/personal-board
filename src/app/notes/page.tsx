@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Pin, Plus, Search, Trash2, ChevronLeft, X, Tag, Calendar, Lock, Eye, EyeOff, Copy, Check, Shield } from 'lucide-react'
+import NoteEditor from '@/components/NoteEditor'
 import { parseTags, sanitizeTag, serializeTags, noteDisplayTitle, matchesSearch } from '@/lib/noteUtils'
 import { deriveKey, encryptText, decryptText, randomSaltHex } from '@/lib/vaultCrypto'
 import { VaultRow, VaultContent, newRowId, parseContent, serializeContent } from '@/lib/vaultContent'
@@ -44,71 +45,6 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
 }
 
-/** 인라인 마크다운(굵기·코드)을 React 노드 배열로 변환 */
-function buildInlineParts(content: string, lineKey: number): React.ReactNode[] {
-  const combined = content
-    .replace(/\*\*(.+?)\*\*/g, '\x00bold\x00$1\x00/bold\x00')
-    .replace(/`(.+?)`/g, '\x00code\x00$1\x00/code\x00')
-  const segments = combined.split('\x00')
-  const parts: React.ReactNode[] = []
-  let bold = false
-  let code = false
-  segments.forEach((seg, j) => {
-    if (seg === 'bold') { bold = true; return }
-    if (seg === '/bold') { bold = false; return }
-    if (seg === 'code') { code = true; return }
-    if (seg === '/code') { code = false; return }
-    if (!seg) return
-    if (bold) {
-      parts.push(<strong key={`${lineKey}-${j}`} style={{ color: 'var(--text-bright)', fontWeight: 600 }}>{seg}</strong>)
-    } else if (code) {
-      parts.push(
-        <code key={`${lineKey}-${j}`} style={{
-          background: 'var(--bg-input)', color: 'var(--accent-light)',
-          padding: '1px 5px', borderRadius: 4, fontSize: '0.85em', fontFamily: 'monospace',
-        }}>{seg}</code>
-      )
-    } else {
-      parts.push(seg)
-    }
-  })
-  return parts
-}
-
-function renderMarkdown(text: string): React.ReactNode[] {
-  return text.split('\n').map((line, i) => {
-    // 수평선
-    if (line === '---') {
-      return <hr key={i} style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '8px 0' }} />
-    }
-
-    // 접두사 파악 & 본문 분리 (헤딩/불릿 prefix는 파싱에서 제외)
-    let content = line
-    let type: 'h1' | 'h2' | 'bullet' | 'plain' = 'plain'
-    if (line.startsWith('# ')) { type = 'h1'; content = line.slice(2) }
-    else if (line.startsWith('## ')) { type = 'h2'; content = line.slice(3) }
-    else if (line.startsWith('- ') || line.startsWith('* ')) { type = 'bullet'; content = line.slice(2) }
-
-    const parts = buildInlineParts(content, i)
-    const inner = parts.length > 0 ? parts : content
-
-    if (type === 'h1') {
-      return <div key={i} style={{ fontWeight: 700, fontSize: '1.1em', color: 'var(--text-bright)', marginTop: 8 }}>{inner}</div>
-    }
-    if (type === 'h2') {
-      return <div key={i} style={{ fontWeight: 600, color: 'var(--text-bright)', marginTop: 6 }}>{inner}</div>
-    }
-    if (type === 'bullet') {
-      return (
-        <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-          <span style={{ color: 'var(--accent-light)', flexShrink: 0, marginTop: 2 }}>•</span>
-          <span>{inner}</span>
-        </div>
-      )
-    }
-    return <div key={i} style={{ minHeight: content ? undefined : '0.75em' }}>{inner}</div>
-  })
-}
 
 export default function NotesPage() {
   // ── 탭 상태 ──
@@ -125,9 +61,7 @@ export default function NotesPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [showTagInput, setShowTagInput] = useState(false)
-  const [previewMode, setPreviewMode] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const contentRef = useRef<HTMLTextAreaElement>(null)
 
   // ── 비밀 메모 (vault) 상태 ──
   const { cryptoKey, setCryptoKey } = useVaultKey()
@@ -180,7 +114,6 @@ export default function NotesPage() {
       tags: note.tags ?? '',
       date: note.date ?? '',
     })
-    setPreviewMode(false)
     setShowEditor(true)
   }
 
@@ -194,7 +127,7 @@ export default function NotesPage() {
       const note = await res.json()
       setNotes(prev => [note, ...prev])
       openNote(note)
-      setTimeout(() => contentRef.current?.focus(), 100)
+      // NoteEditor autoFocus handles this
     }
   }
 
@@ -895,19 +828,6 @@ export default function NotesPage() {
                 {saving ? '저장 중...' : '자동 저장'}
               </span>
 
-              {/* 미리보기 토글 */}
-              <button
-                onClick={() => setPreviewMode(p => !p)}
-                style={{
-                  background: previewMode ? 'var(--accent-dim)' : 'var(--bg-card)',
-                  border: '1px solid var(--border-dim)',
-                  borderRadius: 7, padding: '4px 9px', cursor: 'pointer',
-                  fontSize: 11, color: previewMode ? 'var(--accent-light)' : 'var(--text-dim)',
-                }}
-              >
-                {previewMode ? '편집' : '미리보기'}
-              </button>
-
               {/* Pin 토글 */}
               <button
                 onClick={e => togglePin(selected, e)}
@@ -990,29 +910,13 @@ export default function NotesPage() {
               </div>
             </div>
 
-            {/* 본문: 편집 or 미리보기 */}
-            {previewMode ? (
-              <div
-                style={{
-                  flex: 1, padding: '20px', overflowY: 'auto',
-                  color: 'var(--text)', fontSize: 14, lineHeight: 1.7,
-                }}
-              >
-                {renderMarkdown(draft.content)}
-              </div>
-            ) : (
-              <textarea
-                ref={contentRef}
-                value={draft.content}
-                onChange={e => handleDraftChange('content', e.target.value)}
-                placeholder={'내용을 입력하세요...\n\n마크다운 지원: **굵게**, `코드`, - 목록, # 제목, ---'}
-                style={{
-                  flex: 1, padding: '20px', resize: 'none', background: 'var(--bg-base)',
-                  border: 'none', outline: 'none', color: 'var(--text)', fontSize: 14,
-                  lineHeight: 1.7, fontFamily: 'inherit',
-                }}
-              />
-            )}
+            {/* 본문: WYSIWYG 에디터 */}
+            <NoteEditor
+              noteId={selected.id}
+              content={draft.content}
+              onChange={content => handleDraftChange('content', content)}
+              autoFocus
+            />
           </>
         ) : activeTab === 'notes' ? (
           /* 빈 상태 */
