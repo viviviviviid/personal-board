@@ -43,6 +43,7 @@ export default function RootLayout({
     <html lang="ko" className={`h-full ${caveat.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: `(function(){try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}})()` }} />
+        <script dangerouslySetInnerHTML={{ __html: `(function(){try{if(window.__isNativeApp||navigator.userAgent.indexOf('PersonalBoardApp')!==-1){document.documentElement.setAttribute('data-native','true')}}catch(e){}})()` }} />
       </head>
       <body className="min-h-full antialiased">
         <SessionProviderWrapper>

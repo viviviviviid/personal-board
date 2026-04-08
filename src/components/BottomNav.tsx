@@ -19,16 +19,37 @@ export default function BottomNav() {
   const pathname = usePathname()
   const { data: session } = useSession()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [isNativeApp, setIsNativeApp] = useState(false)
+
+  useEffect(() => {
+    setIsNativeApp(navigator.userAgent.includes('PersonalBoardApp'))
+  }, [])
+
+  useEffect(() => {
+    if (!isNativeApp) return
+    const handler = () => setSettingsOpen(true)
+    window.addEventListener('personalboard:openSettings', handler)
+    return () => window.removeEventListener('personalboard:openSettings', handler)
+  }, [isNativeApp])
 
   useEffect(() => {
     setSettingsOpen(false)
   }, [pathname])
 
+  const handleSettingsClose = () => {
+    setSettingsOpen(false)
+    if (isNativeApp && (window as any).flutter_inappwebview) {
+      ;(window as any).flutter_inappwebview.callHandler('personalBoardBridge', { action: 'settingsClosed' })
+    }
+  }
+
+  if (isNativeApp) return <SettingsModal isOpen={settingsOpen} onClose={handleSettingsClose} />
+
   return (
     <>
-    <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    <SettingsModal isOpen={settingsOpen} onClose={handleSettingsClose} />
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
+      className="bottom-nav-mobile md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
       style={{
         background: 'var(--bg-surface)',
         borderTop: '1px solid var(--border-dim)',
