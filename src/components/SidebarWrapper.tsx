@@ -24,7 +24,7 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
       className="min-h-screen p-3 md:p-4 transition-all duration-200"
       style={{
         marginLeft: isMobile ? 0 : isCollapsed ? 48 : 240,
-        paddingBottom: isMobile && !isNativeApp ? 80 : 16,
+        paddingBottom: isMobile ? (isNativeApp ? 0 : 80) : 16,
         height: '100vh',
         overflowY: 'auto',
         display: 'flex',

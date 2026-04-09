@@ -567,6 +567,7 @@ export default function WeeklyBoard() {
   const [newTodoTitle, setNewTodoTitle] = useState('')
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const [editingTodoTitle, setEditingTodoTitle] = useState('')
+  const [activeTodoId, setActiveTodoId] = useState<string | null>(null)
   const [selectedEntry, setSelectedEntry] = useState<{ entry: TimelineEntry; rect: DOMRect } | null>(null)
   const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number; startTime?: string } | null>(null)
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
@@ -1817,14 +1818,15 @@ export default function WeeklyBoard() {
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-0">
+                  <div className="space-y-0" onClick={isMobile ? () => setActiveTodoId(null) : undefined}>
                     {dayTodos.map(todo => (
                       <div
                         key={todo.id}
                         className="flex items-start gap-1 group px-1 py-0.5 rounded transition-colors"
-                        style={{ cursor: 'default' }}
-                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                        style={{ cursor: 'default', background: isMobile && activeTodoId === todo.id ? 'var(--bg-hover)' : undefined }}
+                        onMouseEnter={isMobile ? undefined : e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                        onMouseLeave={isMobile ? undefined : e => (e.currentTarget.style.background = 'transparent')}
+                        onClick={isMobile ? e => e.stopPropagation() : undefined}
                       >
                         {/* 체크박스 */}
                         <button
@@ -1878,7 +1880,8 @@ export default function WeeklyBoard() {
                         ) : (
                           <span
                             className="text-[12px] leading-snug flex-1 min-w-0 break-words"
-                            style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
+                            style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none', cursor: isMobile ? 'pointer' : 'default' }}
+                            onClick={isMobile ? e => { e.stopPropagation(); setActiveTodoId(activeTodoId === todo.id ? null : todo.id) } : undefined}
                           >
                             {todo.recurringRuleId && <span style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }}>🔁</span>}
                             {todo.title}
@@ -1887,7 +1890,7 @@ export default function WeeklyBoard() {
                         {/* 수정 버튼 */}
                         <button
                           onClick={e => { e.stopPropagation(); startEditTodo(todo) }}
-                          className={`flex-shrink-0 p-0.5 rounded transition-all ${isMobile ? 'opacity-40' : 'opacity-0 group-hover:opacity-60'}`}
+                          className={`flex-shrink-0 p-0.5 rounded transition-all ${isMobile ? (activeTodoId === todo.id ? 'opacity-60' : 'opacity-0 pointer-events-none') : 'opacity-0 group-hover:opacity-60'}`}
                           style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
                           title="수정"
                           onMouseEnter={e => {
@@ -1905,7 +1908,11 @@ export default function WeeklyBoard() {
                         {/* 긴급 버튼 */}
                         <button
                           onClick={() => toggleUrgent(todo.id, todo.urgent)}
-                          className={`flex-shrink-0 p-0.5 rounded transition-all ${todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
+                          className={`flex-shrink-0 p-0.5 rounded transition-all ${
+                            isMobile
+                              ? (todo.urgent ? 'opacity-100' : activeTodoId === todo.id ? 'opacity-60' : 'opacity-0 pointer-events-none')
+                              : (todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-60')
+                          }`}
                           style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)', cursor: 'pointer' }}
                           title={todo.urgent ? '긴급 해제' : '긴급 표시'}
                           onMouseEnter={e => {
@@ -1923,7 +1930,7 @@ export default function WeeklyBoard() {
                         {/* 삭제 버튼 */}
                         <button
                           onClick={() => deleteTodo(todo.id)}
-                          className="opacity-0 group-hover:opacity-70 transition-all flex-shrink-0 p-0.5 rounded"
+                          className={`transition-all flex-shrink-0 p-0.5 rounded ${isMobile ? (activeTodoId === todo.id ? 'opacity-70' : 'opacity-0 pointer-events-none') : 'opacity-0 group-hover:opacity-70'}`}
                           style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
                           title="삭제"
                           onMouseEnter={e => {

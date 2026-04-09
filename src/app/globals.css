@@ -366,7 +366,10 @@ body {
   white-space: pre;
 }
 
-/* Flutter 네이티브 앱: 웹 하단 네비 즉시 숨김 (hydration flash 방지) */
+/* Flutter 네이티브 앱: 웹 하단 네비 즉시 숨김 + 하단 패딩 제거 (hydration flash 방지) */
 [data-native="true"] nav.bottom-nav-mobile {
   display: none !important;
+}
+[data-native="true"] main {
+  padding-bottom: 0 !important;
 }
