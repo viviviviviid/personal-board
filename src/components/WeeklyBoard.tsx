@@ -1828,22 +1828,22 @@ export default function WeeklyBoard() {
                         onMouseLeave={isMobile ? undefined : e => (e.currentTarget.style.background = 'transparent')}
                         onClick={isMobile ? e => e.stopPropagation() : undefined}
                       >
-                        {/* 체크박스 */}
+                        {/* 체크박스 — urgent 시 빨간 테두리 */}
                         <button
                           onClick={() => toggleTodo(todo.id, todo.completed)}
                           className="w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center transition-all mt-px"
                           style={{
-                            background: todo.completed ? 'var(--accent-dim)' : 'transparent',
-                            border: `1.5px solid ${todo.completed ? 'var(--accent)' : 'var(--border)'}`,
+                            background: todo.completed ? 'var(--accent-dim)' : todo.urgent ? 'rgba(239,68,68,0.08)' : 'transparent',
+                            border: `1.5px solid ${todo.completed ? 'var(--accent)' : todo.urgent ? '#ef4444' : 'var(--border)'}`,
                             cursor: 'pointer',
                           }}
                           onMouseEnter={e => {
-                            e.currentTarget.style.borderColor = 'var(--accent)'
-                            e.currentTarget.style.background = todo.completed ? 'var(--accent)' : 'var(--accent-dim)'
+                            e.currentTarget.style.borderColor = todo.urgent ? '#ef4444' : 'var(--accent)'
+                            e.currentTarget.style.background = todo.completed ? 'var(--accent)' : todo.urgent ? 'rgba(239,68,68,0.18)' : 'var(--accent-dim)'
                           }}
                           onMouseLeave={e => {
-                            e.currentTarget.style.borderColor = todo.completed ? 'var(--accent)' : 'var(--border)'
-                            e.currentTarget.style.background = todo.completed ? 'var(--accent-dim)' : 'transparent'
+                            e.currentTarget.style.borderColor = todo.completed ? 'var(--accent)' : todo.urgent ? '#ef4444' : 'var(--border)'
+                            e.currentTarget.style.background = todo.completed ? 'var(--accent-dim)' : todo.urgent ? 'rgba(239,68,68,0.08)' : 'transparent'
                           }}
                         >
                           {todo.completed && <Check size={10} style={{ color: 'var(--accent-light)' }} />}
@@ -1887,11 +1887,11 @@ export default function WeeklyBoard() {
                             {todo.title}
                           </span>
                         )}
-                        {/* 수정 버튼 */}
+                        {/* 수정 버튼 — 활성 시에만 공간 차지 */}
                         <button
                           onClick={e => { e.stopPropagation(); startEditTodo(todo) }}
-                          className={`flex-shrink-0 p-0.5 rounded transition-all ${isMobile ? (activeTodoId === todo.id ? 'opacity-60' : 'opacity-0 pointer-events-none') : 'opacity-0 group-hover:opacity-60'}`}
-                          style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
+                          className={`flex-shrink-0 p-0.5 rounded items-center justify-center ${isMobile ? (activeTodoId === todo.id ? 'flex' : 'hidden') : 'hidden group-hover:flex'}`}
+                          style={{ color: 'var(--text-dim)', cursor: 'pointer', opacity: 0.6 }}
                           title="수정"
                           onMouseEnter={e => {
                             e.currentTarget.style.color = 'var(--accent-light)'
@@ -1901,19 +1901,16 @@ export default function WeeklyBoard() {
                           onMouseLeave={e => {
                             e.currentTarget.style.color = 'var(--text-dim)'
                             e.currentTarget.style.background = 'transparent'
+                            e.currentTarget.style.opacity = '0.6'
                           }}
                         >
                           <Pencil size={11} />
                         </button>
-                        {/* 긴급 버튼 */}
+                        {/* 긴급 버튼 — 활성 시에만 공간 차지, urgent 상태는 체크박스로 표시 */}
                         <button
-                          onClick={() => toggleUrgent(todo.id, todo.urgent)}
-                          className={`flex-shrink-0 p-0.5 rounded transition-all ${
-                            isMobile
-                              ? (todo.urgent ? 'opacity-100' : activeTodoId === todo.id ? 'opacity-60' : 'opacity-0 pointer-events-none')
-                              : (todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-60')
-                          }`}
-                          style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)', cursor: 'pointer' }}
+                          onClick={e => { e.stopPropagation(); toggleUrgent(todo.id, todo.urgent) }}
+                          className={`flex-shrink-0 p-0.5 rounded items-center justify-center ${isMobile ? (activeTodoId === todo.id ? 'flex' : 'hidden') : 'hidden group-hover:flex'}`}
+                          style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)', cursor: 'pointer', opacity: todo.urgent ? 1 : 0.6 }}
                           title={todo.urgent ? '긴급 해제' : '긴급 표시'}
                           onMouseEnter={e => {
                             e.currentTarget.style.color = '#ef4444'
@@ -1923,15 +1920,16 @@ export default function WeeklyBoard() {
                           onMouseLeave={e => {
                             e.currentTarget.style.color = todo.urgent ? '#ef4444' : 'var(--text-dim)'
                             e.currentTarget.style.background = 'transparent'
+                            e.currentTarget.style.opacity = todo.urgent ? '1' : '0.6'
                           }}
                         >
                           <AlertCircle size={13} />
                         </button>
-                        {/* 삭제 버튼 */}
+                        {/* 삭제 버튼 — 활성 시에만 공간 차지 */}
                         <button
-                          onClick={() => deleteTodo(todo.id)}
-                          className={`transition-all flex-shrink-0 p-0.5 rounded ${isMobile ? (activeTodoId === todo.id ? 'opacity-70' : 'opacity-0 pointer-events-none') : 'opacity-0 group-hover:opacity-70'}`}
-                          style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
+                          onClick={e => { e.stopPropagation(); deleteTodo(todo.id) }}
+                          className={`flex-shrink-0 p-0.5 rounded items-center justify-center ${isMobile ? (activeTodoId === todo.id ? 'flex' : 'hidden') : 'hidden group-hover:flex'}`}
+                          style={{ color: 'var(--text-dim)', cursor: 'pointer', opacity: 0.7 }}
                           title="삭제"
                           onMouseEnter={e => {
                             e.currentTarget.style.color = '#ef4444'
@@ -1941,6 +1939,7 @@ export default function WeeklyBoard() {
                           onMouseLeave={e => {
                             e.currentTarget.style.color = 'var(--text-dim)'
                             e.currentTarget.style.background = 'transparent'
+                            e.currentTarget.style.opacity = '0.7'
                           }}
                         >
                           <X size={13} />
