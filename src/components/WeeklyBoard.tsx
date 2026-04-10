@@ -1873,7 +1873,12 @@ export default function WeeklyBoard() {
                             style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none', cursor: isMobile ? 'pointer' : 'default' }}
                             onClick={isMobile ? e => { e.stopPropagation(); setActiveTodoId(activeTodoId === todo.id ? null : todo.id) } : undefined}
                           >
-                            {todo.recurringRuleId && <span style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }}>🔁</span>}
+                            {todo.recurringRuleId && (
+                              <span
+                                className={isMobile ? (activeTodoId === todo.id ? 'inline' : 'hidden') : 'hidden group-hover:inline'}
+                                style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }}
+                              >🔁</span>
+                            )}
                             {todo.title}
                           </span>
                         )}
