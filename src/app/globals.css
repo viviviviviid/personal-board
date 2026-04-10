@@ -371,5 +371,5 @@ body {
   display: none !important;
 }
 [data-native="true"] main {
-  padding-bottom: 0 !important;
+  padding-bottom: 16px !important;
 }
