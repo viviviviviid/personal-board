@@ -1848,16 +1848,6 @@ export default function WeeklyBoard() {
                         >
                           {todo.completed && <Check size={10} style={{ color: 'var(--accent-light)' }} />}
                         </button>
-                        {/* 우선순위 점 — 모바일에서는 숨김 */}
-                        {!isMobile && (
-                          <div
-                            className="w-2 h-2 rounded-full flex-shrink-0 mt-1"
-                            style={{
-                              background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium,
-                              opacity: todo.completed ? 0.3 : 0.8,
-                            }}
-                          />
-                        )}
                         {editingTodoId === todo.id ? (
                           <input
                             autoFocus
