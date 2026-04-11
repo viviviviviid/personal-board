@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
-import { startOfDay, endOfDay, addDays } from 'date-fns'
+import { startOfDay, endOfDay, addDays, subWeeks, parseISO } from 'date-fns'
+import { getUserPlan, FREE_LIMITS } from '@/lib/plan'
 import { generateDates, createRecurringTimelineEntries, RECURRING_WINDOW_DAYS, type RecurringFreq } from '@/lib/recurring'
 
 export async function GET(request: NextRequest) {
@@ -14,6 +15,20 @@ export async function GET(request: NextRequest) {
     const weekParam = searchParams.get('week')
     const startDateParam = searchParams.get('startDate')
     const endDateParam = searchParams.get('endDate')
+
+    const plan = await getUserPlan(session.user.id)
+    if (plan === 'free') {
+      const requestedDateParam = weekParam ?? dateParam ?? startDateParam
+      if (requestedDateParam) {
+        const cutoff = subWeeks(new Date(), FREE_LIMITS.timelineWeeks)
+        if (parseISO(requestedDateParam) < cutoff) {
+          return NextResponse.json(
+            { error: 'Free plan: history limited to 4 weeks', code: 'UPGRADE_REQUIRED' },
+            { status: 402 }
+          )
+        }
+      }
+    }
 
     if (startDateParam && endDateParam) {
       const entries = await prisma.timelineEntry.findMany({

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { assertPro } from '@/lib/plan'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { startOfDay, endOfDay, addDays, format } from 'date-fns'
 
@@ -8,6 +9,9 @@ export async function POST(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const upgradeRes = await assertPro(session.user.id)
+    if (upgradeRes) return upgradeRes
 
     const body = await request.json()
     const { weekStart, dataTypes: rawDataTypes } = body

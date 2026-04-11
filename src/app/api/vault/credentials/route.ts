@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { assertPro } from '@/lib/plan'
 import { prisma } from '@/lib/prisma'
 
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const upgradeRes = await assertPro(session.user.id)
+  if (upgradeRes) return upgradeRes
   const credentials = await prisma.credential.findMany({
     where: { userId: session.user.id },
     orderBy: [{ pinned: 'desc' }, { updatedAt: 'desc' }],
@@ -15,6 +18,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const upgradeRes = await assertPro(session.user.id)
+  if (upgradeRes) return upgradeRes
   const { name, type, encryptedValue, iv, description, pinned } = await request.json()
   if (!name || !encryptedValue || !iv) return NextResponse.json({ error: 'name, encryptedValue, iv required' }, { status: 400 })
   const credential = await prisma.credential.create({

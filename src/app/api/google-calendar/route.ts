@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
+import { assertPro } from '@/lib/plan'
 import { getValidGoogleToken } from '@/lib/google-token'
 
 interface RawEvent {
@@ -52,6 +53,9 @@ export async function GET(request: NextRequest) {
   try {
     const session = await auth()
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const upgradeRes = await assertPro(session.user.id)
+    if (upgradeRes) return upgradeRes
 
     const { searchParams } = request.nextUrl
     const timeMin = searchParams.get('timeMin')

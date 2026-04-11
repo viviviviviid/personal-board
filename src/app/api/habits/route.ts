@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
 import { subDays } from 'date-fns'
+import { getUserPlan, FREE_LIMITS } from '@/lib/plan'
 import { computeStreak, getWeekHistory, getHeatmapHistory } from '@/lib/habitUtils'
 
 export async function GET(request: NextRequest) {
@@ -73,6 +74,17 @@ export async function POST(request: NextRequest) {
 
     if (!name) {
       return NextResponse.json({ error: '습관 이름은 필수입니다.' }, { status: 400 })
+    }
+
+    const plan = await getUserPlan(session.user.id)
+    if (plan === 'free') {
+      const count = await prisma.habit.count({ where: { userId: session.user.id } })
+      if (count >= FREE_LIMITS.habits) {
+        return NextResponse.json(
+          { error: 'Free plan limit reached', code: 'UPGRADE_REQUIRED' },
+          { status: 402 }
+        )
+      }
     }
 
     const habit = await prisma.habit.create({

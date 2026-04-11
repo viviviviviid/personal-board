@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/lib/auth'
+import { getUserPlan, FREE_LIMITS } from '@/lib/plan'
 
 export async function GET() {
   try {
@@ -43,6 +44,17 @@ export async function POST(request: NextRequest) {
 
     if (!name) {
       return NextResponse.json({ error: '프로젝트 이름은 필수입니다.' }, { status: 400 })
+    }
+
+    const plan = await getUserPlan(session.user.id)
+    if (plan === 'free') {
+      const count = await prisma.project.count({ where: { userId: session.user.id } })
+      if (count >= FREE_LIMITS.projects) {
+        return NextResponse.json(
+          { error: 'Free plan limit reached', code: 'UPGRADE_REQUIRED' },
+          { status: 402 }
+        )
+      }
     }
 
     const project = await prisma.project.create({
