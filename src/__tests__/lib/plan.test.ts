@@ -1,4 +1,4 @@
-import { getUserPlan, FREE_LIMITS } from '@/lib/plan'
+import { getUserPlan, assertPro, FREE_LIMITS } from '@/lib/plan'
 
 jest.mock('@/lib/prisma', () => ({
   prisma: {
@@ -40,6 +40,25 @@ describe('getUserPlan', () => {
     const past = new Date(Date.now() - 1000)
     mockFindUnique.mockResolvedValue({ plan: 'pro', expiresAt: past })
     expect(await getUserPlan('user1')).toBe('free')
+  })
+})
+
+describe('assertPro', () => {
+  beforeEach(() => jest.clearAllMocks())
+
+  it('pro 플랜이면 null 반환', async () => {
+    mockFindUnique.mockResolvedValue({ plan: 'pro', expiresAt: null })
+    const result = await assertPro('user1')
+    expect(result).toBeNull()
+  })
+
+  it('free 플랜이면 402 NextResponse 반환', async () => {
+    mockFindUnique.mockResolvedValue({ plan: 'free', expiresAt: null })
+    const result = await assertPro('user1')
+    expect(result).not.toBeNull()
+    expect(result?.status).toBe(402)
+    const body = await result?.json()
+    expect(body.code).toBe('UPGRADE_REQUIRED')
   })
 })
 
