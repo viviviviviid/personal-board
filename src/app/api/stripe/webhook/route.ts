@@ -6,7 +6,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
 export async function POST(request: NextRequest) {
   const body = await request.text()
-  const sig = request.headers.get('stripe-signature')!
+  const sig = request.headers.get('stripe-signature')
+  if (!sig) return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
 
   let event: Stripe.Event
   try {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
       const userId = sub.metadata.userId
       if (!userId) break
       const isActive = sub.status === 'active' || sub.status === 'trialing'
-      const periodEnd = sub.items?.data?.[0]?.current_period_end ?? sub.trial_end
+      const periodEnd = (sub as unknown as { current_period_end: number }).current_period_end
       const expiresAt = isActive && periodEnd
         ? new Date(periodEnd * 1000)
         : new Date()

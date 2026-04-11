@@ -19,7 +19,10 @@ export async function POST(request: NextRequest) {
   const validPriceIds = [
     process.env.STRIPE_PRO_MONTHLY_PRICE_ID,
     process.env.STRIPE_PRO_YEARLY_PRICE_ID,
-  ]
+  ].filter(Boolean)
+  if (validPriceIds.length === 0) {
+    return NextResponse.json({ error: 'Stripe prices not configured' }, { status: 500 })
+  }
   if (!validPriceIds.includes(priceId)) {
     return NextResponse.json({ error: 'Invalid priceId' }, { status: 400 })
   }
