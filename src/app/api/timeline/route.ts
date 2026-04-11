@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const plan = await getUserPlan(session.user.id)
     if (plan === 'free') {
-      const requestedDateParam = weekParam ?? dateParam ?? startDateParam
+      const requestedDateParam = weekParam ?? dateParam ?? startDateParam ?? endDateParam
       if (requestedDateParam) {
         const cutoff = subWeeks(new Date(), FREE_LIMITS.timelineWeeks)
         if (parseISO(requestedDateParam) < cutoff) {
