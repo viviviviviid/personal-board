@@ -1,9 +1,16 @@
+import { timingSafeEqual } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
-  if (authHeader !== process.env.REVENUECAT_WEBHOOK_AUTH_KEY) {
+  const secret = process.env.REVENUECAT_WEBHOOK_AUTH_KEY
+  const isValid =
+    secret &&
+    authHeader &&
+    authHeader.length === secret.length &&
+    timingSafeEqual(Buffer.from(authHeader), Buffer.from(secret))
+  if (!isValid) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
