@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { Sparkles, X, Loader2, CalendarDays, BarChart2, FolderKanban, RefreshCw } from 'lucide-react'
+import UpgradeModal from '@/components/UpgradeModal'
+import { useUpgradeModal } from '@/hooks/useUpgradeModal'
 
 type Mode = 'weekly' | 'daily' | 'project'
 
@@ -45,6 +47,7 @@ export default function AIPanel({
   const [results, setResults] = useState<Partial<Record<Mode, string>>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { upgradeOpen, upgradeReason, triggerUpgrade, closeUpgrade } = useUpgradeModal()
 
   const currentMode = MODES.find((m) => m.key === mode)!
 
@@ -63,6 +66,10 @@ export default function AIPanel({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ weekStart: format(date, 'yyyy-MM-dd') }),
         })
+        if (res.status === 402) {
+          triggerUpgrade('AI 기능은 Pro 플랜에서 사용할 수 있습니다.')
+          return
+        }
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
         setResults((prev) => ({ ...prev, weekly: data.feedback }))
@@ -73,6 +80,10 @@ export default function AIPanel({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ date: format(date, 'yyyy-MM-dd') }),
         })
+        if (res.status === 402) {
+          triggerUpgrade('AI 기능은 Pro 플랜에서 사용할 수 있습니다.')
+          return
+        }
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
         setResults((prev) => ({ ...prev, daily: data.brief }))
@@ -82,6 +93,10 @@ export default function AIPanel({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ projectId }),
         })
+        if (res.status === 402) {
+          triggerUpgrade('AI 기능은 Pro 플랜에서 사용할 수 있습니다.')
+          return
+        }
         const data = await res.json()
         if (!res.ok) throw new Error(data.error)
         setResults((prev) => ({ ...prev, project: data.diagnosis }))
@@ -161,6 +176,7 @@ export default function AIPanel({
 
   return (
     <>
+      <UpgradeModal open={upgradeOpen} onClose={closeUpgrade} reason={upgradeReason} />
       <button
         onClick={handleOpen}
         title="AI 어시스턴트"

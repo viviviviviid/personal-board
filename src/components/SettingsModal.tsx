@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useSession, signOut, signIn } from 'next-auth/react'
 import Image from 'next/image'
 import { X, LogOut, Calendar, Sun, Moon } from 'lucide-react'
+import UpgradeModal from '@/components/UpgradeModal'
+import { useUpgradeModal } from '@/hooks/useUpgradeModal'
 
 const CALENDAR_SCOPE = 'openid email profile https://www.googleapis.com/auth/calendar.readonly'
 
@@ -13,15 +15,99 @@ interface SettingsModalProps {
 }
 
 type CalStatus = 'loading' | 'ok' | 'no_token' | 'error'
+type SettingsTab = 'general' | 'billing'
+
+type PlanInfo = { plan: string } | null
+
+function BillingTab({ onOpenUpgrade }: { onOpenUpgrade: (msg?: string) => void }) {
+  const [planInfo, setPlanInfo] = useState<PlanInfo>(null)
+  const [planLoading, setPlanLoading] = useState(true)
+  const [portalLoading, setPortalLoading] = useState(false)
+
+  useEffect(() => {
+    setPlanLoading(true)
+    fetch('/api/subscription')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => setPlanInfo(data))
+      .catch(() => setPlanInfo({ plan: 'free' }))
+      .finally(() => setPlanLoading(false))
+  }, [])
+
+  const handlePortal = async () => {
+    setPortalLoading(true)
+    const res = await fetch('/api/stripe/portal', { method: 'POST' })
+    const data = await res.json()
+    if (data.url) window.location.href = data.url
+    else setPortalLoading(false)
+  }
+
+  const isPro = planInfo?.plan === 'pro'
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{ border: '1px solid var(--border)' }}
+    >
+      <div className="px-4 py-3" style={{ background: 'var(--bg-card)' }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>현재 플랜</p>
+            {planLoading ? (
+              <div className="mt-1 h-4 w-16 rounded animate-pulse" style={{ background: 'var(--border)' }} />
+            ) : (
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-dim)' }}>
+                {isPro ? 'Pro' : 'Free'}
+              </p>
+            )}
+          </div>
+          {!planLoading && (
+            isPro ? (
+              <span
+                className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}
+              >
+                Pro
+              </span>
+            ) : (
+              <span
+                className="text-xs px-2 py-0.5 rounded-full"
+                style={{ background: 'var(--bg-input)', color: 'var(--text-dim)', border: '1px solid var(--border)' }}
+              >
+                Free
+              </span>
+            )
+          )}
+        </div>
+
+        {!planLoading && (
+          <button
+            onClick={isPro ? handlePortal : () => onOpenUpgrade()}
+            disabled={portalLoading}
+            className="mt-3 text-sm w-full text-center py-2 rounded-lg transition-all font-medium disabled:opacity-60"
+            style={
+              isPro
+                ? { background: 'var(--bg-input)', color: 'var(--text-muted)', border: '1px solid var(--border)' }
+                : { background: 'var(--accent-dim)', color: 'var(--accent-light)', border: '1px solid var(--accent)' }
+            }
+          >
+            {portalLoading ? '로딩 중...' : isPro ? '구독 관리' : '업그레이드'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { data: session } = useSession()
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [calStatus, setCalStatus] = useState<CalStatus>('loading')
   const [defaultView, setDefaultView] = useState<'weekly' | 'monthly'>('weekly')
   const [weekStart, setWeekStart] = useState<'mon' | 'sun'>('mon')
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
   const [autoFeedback, setAutoFeedback] = useState(false)
   const [feedbackDataTypes, setFeedbackDataTypes] = useState<string[]>(['todos', 'timeline', 'habits', 'highlights'])
+  const { upgradeOpen, upgradeReason, triggerUpgrade, closeUpgrade } = useUpgradeModal()
 
   useEffect(() => {
     if (!isOpen) return
@@ -88,6 +174,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const user = session?.user
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
       style={{ background: 'rgba(0,0,0,0.6)' }}
@@ -117,8 +204,36 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </button>
         </div>
 
+        {/* ── 탭 ── */}
+        <div className="flex px-5 gap-1 mb-1" style={{ borderBottom: '1px solid var(--border-dim)' }}>
+          {(['general', 'billing'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className="px-3 py-2 text-xs transition-all mb-[-1px]"
+              style={{
+                color: activeTab === tab ? 'var(--accent-light)' : 'var(--text-muted)',
+                borderBottom: activeTab === tab ? '2px solid var(--accent)' : '2px solid transparent',
+                fontWeight: activeTab === tab ? 600 : 400,
+              }}
+            >
+              {tab === 'general' ? '일반' : '빌링'}
+            </button>
+          ))}
+        </div>
+
         <div className="px-5 pb-2">
 
+          {activeTab === 'billing' && (
+            <>
+              <div className="my-4" />
+              <p className="text-[10px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--text-dim)' }}>빌링</p>
+              <BillingTab onOpenUpgrade={triggerUpgrade} />
+            </>
+          )}
+
+          {activeTab === 'general' && (
+          <>
           {/* ── 계정 ── */}
           <p className="text-[10px] font-semibold tracking-widest uppercase mb-3" style={{ color: 'var(--text-dim)' }}>계정</p>
           {user ? (
@@ -339,9 +454,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <LogOut size={15} />
             로그아웃
           </button>
+          </>
+          )}
 
         </div>
       </div>
     </div>
+
+    <UpgradeModal open={upgradeOpen} onClose={closeUpgrade} reason={upgradeReason} />
+    </>
   )
 }
