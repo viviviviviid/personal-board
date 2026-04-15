@@ -62,6 +62,8 @@ export default function NotesPage() {
   const [tagInput, setTagInput] = useState('')
   const [showTagInput, setShowTagInput] = useState(false)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const draftRef = useRef(draft)
+  const selectedRef = useRef(selected)
 
   // ── 비밀 메모 (vault) 상태 ──
   const { cryptoKey, setCryptoKey } = useVaultKey()
@@ -105,7 +107,26 @@ export default function NotesPage() {
     return () => clearTimeout(t)
   }, [query, tagFilter, fetchNotes])
 
+  // ref 동기화
+  useEffect(() => { selectedRef.current = selected }, [selected])
+  useEffect(() => { draftRef.current = draft }, [draft])
+
+  // 빈 메모 정리 — ref 기반이라 어느 시점에서든 최신 값 사용 가능
+  const maybePurgeEmpty = useCallback(() => {
+    const cur = selectedRef.current
+    const d = draftRef.current
+    if (!cur) return
+    if (!d.content.trim() && !d.title.trim()) {
+      clearTimeout(saveTimer.current)
+      fetch(`/api/notes/${cur.id}`, { method: 'DELETE' }).catch(() => {})
+      setNotes(prev => prev.filter(n => n.id !== cur.id))
+      setSelected(null)
+      setShowEditor(false)
+    }
+  }, [])
+
   const openNote = (note: Note) => {
+    maybePurgeEmpty()
     clearTimeout(saveTimer.current)
     setSelected(note)
     setDraft({
@@ -116,6 +137,11 @@ export default function NotesPage() {
     })
     setShowEditor(true)
   }
+
+  // 페이지 언마운트 시 빈 메모 정리
+  useEffect(() => {
+    return () => { maybePurgeEmpty() }
+  }, [maybePurgeEmpty])
 
   const newNote = async () => {
     const res = await fetch('/api/notes', {
@@ -158,6 +184,7 @@ export default function NotesPage() {
 
   const handleDraftChange = (field: keyof typeof draft, value: string) => {
     const next = { ...draft, [field]: value }
+    draftRef.current = next
     setDraft(next)
     scheduleSave(next)
   }
@@ -430,14 +457,10 @@ export default function NotesPage() {
 
   // 에디터 닫기 — 내용 없으면 자동 삭제
   const closeEditor = useCallback(() => {
-    clearTimeout(saveTimer.current)
-    if (selected && !draft.content.trim() && !draft.title.trim()) {
-      fetch(`/api/notes/${selected.id}`, { method: 'DELETE' }).catch(() => {})
-      setNotes(prev => prev.filter(n => n.id !== selected.id))
-    }
+    maybePurgeEmpty()
     setSelected(null)
     setShowEditor(false)
-  }, [selected, draft])
+  }, [maybePurgeEmpty])
 
   // 탭 전환 시 에디터 닫기
   const handleTabChange = (tab: 'notes' | 'vault') => {
@@ -451,7 +474,7 @@ export default function NotesPage() {
   const isEditorShown = activeTab === 'notes' ? showEditor : showCredEditor
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: 'var(--bg-base)' }}>
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: 'var(--bg-base)', width: '100%' }} className="-m-3 md:-m-4">
 
       {/* ── 목록 패널 ── */}
       <div

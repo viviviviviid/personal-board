@@ -775,10 +775,11 @@ export default function WeeklyBoard() {
     }
   }, [isMobile, mobileDay, navigateWeek])
 
-  // 타임라인 스크롤 초기 위치
+  // 타임라인 스크롤 초기 위치 — outerScrollRef가 전체 스크롤 담당
   useEffect(() => {
-    const el = gridScrollRef.current
-    if (!el) return
+    const outer = outerScrollRef.current
+    const topSection = topSectionRef.current
+    if (!outer || !topSection) return
 
     const DEFAULT_HOUR = 9
     const defaultY = (DEFAULT_HOUR - FIRST_HOUR) * ROW_H  // 9시 = 208px
@@ -793,21 +794,22 @@ export default function WeeklyBoard() {
       .filter(e => isSameDay(new Date(e.date), targetDay))
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
 
-    let scrollY: number
-    // 오늘이 현재 주에 표시 중이고 현재 시간 위치를 계산할 수 있으면 현재 시간으로 스크롤
+    let timelineY: number
     if (todayInWeek && currentNowY !== null) {
-      scrollY = Math.max(0, currentNowY - 100)
+      timelineY = Math.max(0, currentNowY - 100)
     } else if (dayEntries.length > 0) {
       const [h, m] = dayEntries[0].startTime.split(':').map(Number)
       const entryY = (h - FIRST_HOUR) * ROW_H + (m / 60) * ROW_H
-      // 이벤트 위에 여백 확보, 최소 0, 최대는 브라우저가 자연히 클램프
-      scrollY = Math.max(0, entryY - 80)
+      timelineY = Math.max(0, entryY - 80)
     } else {
-      scrollY = defaultY
+      timelineY = defaultY
     }
 
+    // topSection 높이 + 타임라인 내 위치 = outer 스크롤 목표
+    const scrollTop = topSection.offsetHeight + timelineY
+
     const timer = setTimeout(() => {
-      el.scrollTo({ top: scrollY, behavior: 'instant' as ScrollBehavior })
+      outer.scrollTo({ top: scrollTop, behavior: 'instant' as ScrollBehavior })
     }, 30)
     return () => clearTimeout(timer)
   }, [currentWeekStart, mobileDay, loading])
@@ -1746,7 +1748,7 @@ export default function WeeklyBoard() {
         ref={outerScrollRef}
         key={currentWeekStart.toISOString()}
         className={`flex-1 flex flex-col rounded-xl${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
-        style={{ minWidth: 0, border: '1px solid var(--border)', overflowX: 'auto', overflowY: 'hidden' }}
+        style={{ minWidth: 0, border: '1px solid var(--border)', overflowX: 'auto', overflowY: 'auto' }}
         onAnimationEnd={() => setSlideDir(null)}
       >
         {/* ── 상단 고정: 헤더 + 하이라이트 + TO-DO ── */}
@@ -2068,7 +2070,7 @@ export default function WeeklyBoard() {
         {/* ── 하단 독립 스크롤: 타임라인 ── */}
         <div
           ref={gridScrollRef}
-          style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'visible', overscrollBehavior: 'contain' }}
+          style={{ flexShrink: 0, overflowX: 'clip', overscrollBehavior: 'contain' }}
         >
         <div style={{
           display: 'grid',
