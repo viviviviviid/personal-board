@@ -474,7 +474,7 @@ export default function NotesPage() {
   const isEditorShown = activeTab === 'notes' ? showEditor : showCredEditor
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: 'var(--bg-base)', width: '100%' }} className="-m-3 md:-m-4">
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', background: 'var(--bg-base)' }} className="-m-3 md:-m-4">
 
       {/* ── 목록 패널 ── */}
       <div
