@@ -14,6 +14,8 @@ export async function GET() {
   try {
     const session = await auth()
     if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // NOTE: Intentionally not pro-gated — free users can check Calendar connection status
+    // Only event fetching (/api/google-calendar) is pro-gated
 
     const accessToken = await getValidGoogleToken(session.user.id)
     if (!accessToken) {
