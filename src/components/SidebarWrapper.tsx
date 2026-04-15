@@ -2,9 +2,14 @@
 
 import { useSidebar } from '@/context/SidebarContext'
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
+
+// 패딩·스크롤 없이 전체 공간을 스스로 관리하는 full-page 레이아웃 경로
+const FULL_PAGE_ROUTES = ['/notes']
 
 export default function SidebarWrapper({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar()
+  const pathname = usePathname()
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
@@ -14,14 +19,16 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
     return () => window.removeEventListener('resize', check)
   }, [])
 
+  const isFullPage = FULL_PAGE_ROUTES.some(r => pathname.startsWith(r))
+
   return (
     <main
-      className="min-h-screen p-3 md:p-4 transition-all duration-200"
+      className={`transition-all duration-200 ${isFullPage ? '' : 'min-h-screen p-3 md:p-4'}`}
       style={{
         marginLeft: isMobile ? 0 : isCollapsed ? 48 : 240,
-        paddingBottom: isMobile ? 80 : 16,
+        paddingBottom: isFullPage ? 0 : isMobile ? 80 : 16,
         height: '100vh',
-        overflowY: 'auto',
+        overflowY: isFullPage ? 'hidden' : 'auto',
         display: 'flex',
         flexDirection: 'column',
       }}

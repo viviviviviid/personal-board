@@ -7,7 +7,6 @@ import { parseTags, sanitizeTag, serializeTags, noteDisplayTitle, matchesSearch 
 import { deriveKey, encryptText, decryptText, randomSaltHex } from '@/lib/vaultCrypto'
 import { VaultRow, VaultContent, newRowId, parseContent, serializeContent } from '@/lib/vaultContent'
 import { useVaultKey } from '@/context/VaultContext'
-import { useSidebar } from '@/context/SidebarContext'
 
 interface Note {
   id: string
@@ -48,14 +47,6 @@ function formatDate(iso: string): string {
 
 
 export default function NotesPage() {
-  const { isCollapsed } = useSidebar()
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
 
   // ── 탭 상태 ──
   const [activeTab, setActiveTab] = useState<'notes' | 'vault'>('notes')
@@ -484,16 +475,7 @@ export default function NotesPage() {
   const isEditorShown = activeTab === 'notes' ? showEditor : showCredEditor
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: isMobile ? 0 : isCollapsed ? 48 : 240,
-      right: 0,
-      bottom: 0,
-      display: 'flex',
-      overflow: 'hidden',
-      background: 'var(--bg-base)',
-    }}>
+    <div style={{ display: 'flex', height: '100%', overflow: 'hidden', background: 'var(--bg-base)' }}>
 
       {/* ── 목록 패널 ── */}
       <div
