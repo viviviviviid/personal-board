@@ -539,6 +539,7 @@ export default function WeeklyBoard() {
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
   const [monthCount, setMonthCount] = useState<1 | 2 | 3>(1)
   const [mobileDayCols, setMobileDayCols] = useState(2)
+  const [desktopDayCols, setDesktopDayCols] = useState(7)
   const [todos, setTodos] = useState<Todo[]>([])
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([])
@@ -702,6 +703,17 @@ export default function WeeklyBoard() {
     localStorage.setItem('board-mobile-cols', String(n))
   }
 
+  // Persist desktopDayCols
+  useEffect(() => {
+    const saved = localStorage.getItem('board-desktop-cols')
+    if (saved && [3, 5, 7].includes(Number(saved))) setDesktopDayCols(Number(saved))
+  }, [])
+
+  const setDesktopDayColsPersist = (n: number) => {
+    setDesktopDayCols(n)
+    localStorage.setItem('board-desktop-cols', String(n))
+  }
+
   // Current time
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 60000)
@@ -778,6 +790,11 @@ export default function WeeklyBoard() {
 
     const timer = setTimeout(() => {
       el.scrollTo({ top: scrollY, behavior: 'instant' as ScrollBehavior })
+      // 오늘이 이번 주에 있으면 타임라인 섹션이 보이도록 외부 컨테이너도 스크롤
+      if (todayInWeek && outerScrollRef.current && topSectionRef.current) {
+        const topH = topSectionRef.current.offsetHeight
+        outerScrollRef.current.scrollTo({ top: topH, behavior: 'instant' as ScrollBehavior })
+      }
     }, 30)
     return () => clearTimeout(timer)
   }, [currentWeekStart, mobileDay, loading])
@@ -817,6 +834,8 @@ export default function WeeklyBoard() {
   const timelineRef = useRef<TimelineEntry[]>([])
   useEffect(() => { timelineRef.current = timeline }, [timeline])
 
+  const outerScrollRef = useRef<HTMLDivElement>(null)
+  const topSectionRef = useRef<HTMLDivElement>(null)
   const columnRefs = useRef<(HTMLDivElement | null)[]>([])
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i))
 
@@ -1186,10 +1205,13 @@ export default function WeeklyBoard() {
     ? format(currentMonth, 'yyyy년 M월')
     : `${format(currentMonth, 'yyyy.MM')} — ${format(addMonths(currentMonth, monthCount - 1), 'yyyy.MM')}`
   const nowY = nowToY(now)
-  const gridCols = `32px repeat(7, minmax(0, 1fr))`
   const mobileStart = isMobile ? Math.min(mobileDay, Math.max(0, 7 - mobileDayCols)) : 0
-  const visibleDays = isMobile ? weekDays.slice(mobileStart, mobileStart + mobileDayCols) : weekDays
-  const mobileCols = `32px repeat(${visibleDays.length}, minmax(0, 1fr))`
+  const visibleDays = isMobile
+    ? weekDays.slice(mobileStart, mobileStart + mobileDayCols)
+    : weekDays.slice(0, desktopDayCols)
+  const colCount = visibleDays.length
+  const gridCols = `32px repeat(${colCount}, minmax(0, 1fr))`
+  const gridMinWidth = isMobile ? 0 : Math.max(320, colCount * 130 + 32)
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -1407,7 +1429,25 @@ export default function WeeklyBoard() {
                       borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
                     }}
                   >
-                    {n}줄
+                    {n}일
+                  </button>
+                ))}
+              </div>
+            )}
+            {view === 'weekly' && !isMobile && (
+              <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+                {[3, 5, 7].map((n, i, arr) => (
+                  <button
+                    key={n}
+                    onClick={() => setDesktopDayColsPersist(n)}
+                    className="px-2 py-1 text-xs transition-all"
+                    style={{
+                      background: desktopDayCols === n ? 'var(--accent-dim)' : 'var(--bg-card)',
+                      color: desktopDayCols === n ? 'var(--accent-light)' : 'var(--text-muted)',
+                      borderRight: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
+                    }}
+                  >
+                    {n}일
                   </button>
                 ))}
               </div>
@@ -1690,17 +1730,18 @@ export default function WeeklyBoard() {
       )}
 
       {view === 'weekly' && <div
+        ref={outerScrollRef}
         key={currentWeekStart.toISOString()}
         className={`flex-1 flex flex-col rounded-xl${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
-        style={{ minWidth: 0, border: '1px solid var(--border)', overflowX: 'hidden', overflowY: 'auto', scrollSnapType: 'y proximity' }}
+        style={{ minWidth: 0, border: '1px solid var(--border)', overflowX: 'auto', overflowY: 'auto', scrollSnapType: 'y proximity' }}
         onAnimationEnd={() => setSlideDir(null)}
       >
         {/* ── 상단 고정: 헤더 + 하이라이트 + TO-DO ── */}
-        <div style={{ flexShrink: 0, overflowX: isMobile ? 'hidden' : 'auto', scrollSnapAlign: 'start' }}>
+        <div ref={topSectionRef} style={{ flexShrink: 0, scrollSnapAlign: 'start' }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? mobileCols : gridCols,
-          minWidth: isMobile ? 0 : '760px',
+          gridTemplateColumns: gridCols,
+          minWidth: gridMinWidth,
         }}>
 
           {/* ── Day headers ── */}
@@ -1818,129 +1859,111 @@ export default function WeeklyBoard() {
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-0" onClick={isMobile ? () => setActiveTodoId(null) : undefined}>
-                    {dayTodos.map(todo => (
-                      <div
-                        key={todo.id}
-                        className="flex items-start gap-1 group px-1 py-0.5 rounded transition-colors"
-                        style={{ cursor: 'default', background: isMobile && activeTodoId === todo.id ? 'var(--bg-hover)' : undefined }}
-                        onMouseEnter={isMobile ? undefined : e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-                        onMouseLeave={isMobile ? undefined : e => (e.currentTarget.style.background = 'transparent')}
-                        onClick={isMobile ? e => e.stopPropagation() : undefined}
-                      >
-                        {/* 체크박스 — urgent 시 빨간 테두리 */}
-                        <button
-                          onClick={() => toggleTodo(todo.id, todo.completed)}
-                          className="w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center transition-all mt-px"
-                          style={{
-                            background: todo.completed ? 'var(--accent-dim)' : todo.urgent ? 'rgba(239,68,68,0.08)' : 'transparent',
-                            border: `1.5px solid ${todo.completed ? 'var(--accent)' : todo.urgent ? '#ef4444' : 'var(--border)'}`,
-                            cursor: 'pointer',
-                          }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.borderColor = todo.urgent ? '#ef4444' : 'var(--accent)'
-                            e.currentTarget.style.background = todo.completed ? 'var(--accent)' : todo.urgent ? 'rgba(239,68,68,0.18)' : 'var(--accent-dim)'
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.borderColor = todo.completed ? 'var(--accent)' : todo.urgent ? '#ef4444' : 'var(--border)'
-                            e.currentTarget.style.background = todo.completed ? 'var(--accent-dim)' : todo.urgent ? 'rgba(239,68,68,0.08)' : 'transparent'
-                          }}
+                  <div className="space-y-0" onClick={() => setActiveTodoId(null)}>
+                    {dayTodos.map(todo => {
+                      const isActive = activeTodoId === todo.id
+                      return (
+                        <div
+                          key={todo.id}
+                          className="flex flex-col px-1 py-1 rounded transition-colors"
+                          style={{ background: isActive ? 'var(--bg-hover)' : 'transparent' }}
+                          onClick={e => e.stopPropagation()}
                         >
-                          {todo.completed && <Check size={10} style={{ color: 'var(--accent-light)' }} />}
-                        </button>
-                        {editingTodoId === todo.id ? (
-                          <input
-                            autoFocus
-                            value={editingTodoTitle}
-                            onChange={e => setEditingTodoTitle(e.target.value)}
-                            onKeyDown={e => {
-                              e.stopPropagation()
-                              if (e.key === 'Enter' && !e.nativeEvent.isComposing) commitEditTodo(todo)
-                              if (e.key === 'Escape') setEditingTodoId(null)
-                            }}
-                            onBlur={() => commitEditTodo(todo)}
-                            onClick={e => e.stopPropagation()}
-                            className="text-[12px] flex-1 min-w-0 focus:outline-none"
-                            style={{
-                              background: 'transparent',
-                              borderBottom: '1px solid var(--accent)',
-                              color: 'var(--text)',
-                            }}
-                          />
-                        ) : (
-                          <span
-                            className="text-[12px] leading-snug flex-1 min-w-0 break-words"
-                            style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none', cursor: isMobile ? 'pointer' : 'default' }}
-                            onClick={isMobile ? e => { e.stopPropagation(); setActiveTodoId(activeTodoId === todo.id ? null : todo.id) } : undefined}
-                          >
-                            {todo.recurringRuleId && (
+                          {/* Row 1: checkbox + text */}
+                          <div className="flex items-start gap-1">
+                            {/* 체크박스 — urgent 시 빨간 배경 */}
+                            <button
+                              onClick={() => toggleTodo(todo.id, todo.completed)}
+                              className="w-3.5 h-3.5 rounded flex-shrink-0 flex items-center justify-center transition-all mt-px"
+                              style={{
+                                background: todo.completed ? 'var(--accent-dim)' : todo.urgent ? 'rgba(239,68,68,0.18)' : 'transparent',
+                                border: `1.5px solid ${todo.completed ? 'var(--accent)' : todo.urgent ? '#ef4444' : 'var(--border)'}`,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {todo.completed && <Check size={10} style={{ color: 'var(--accent-light)' }} />}
+                            </button>
+                            {editingTodoId === todo.id ? (
+                              <input
+                                autoFocus
+                                value={editingTodoTitle}
+                                onChange={e => setEditingTodoTitle(e.target.value)}
+                                onKeyDown={e => {
+                                  e.stopPropagation()
+                                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) commitEditTodo(todo)
+                                  if (e.key === 'Escape') setEditingTodoId(null)
+                                }}
+                                onBlur={() => commitEditTodo(todo)}
+                                onClick={e => e.stopPropagation()}
+                                className="text-[12px] flex-1 min-w-0 focus:outline-none"
+                                style={{ background: 'transparent', borderBottom: '1px solid var(--accent)', color: 'var(--text)' }}
+                              />
+                            ) : (
                               <span
-                                className={isMobile ? (activeTodoId === todo.id ? 'inline' : 'hidden') : 'hidden group-hover:inline'}
-                                style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }}
-                              >🔁</span>
+                                className="text-[12px] leading-snug flex-1 min-w-0 break-words cursor-pointer"
+                                style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
+                                onClick={e => { e.stopPropagation(); setActiveTodoId(isActive ? null : todo.id) }}
+                              >
+                                {todo.recurringRuleId && (
+                                  <span style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }} className={isActive ? 'inline' : 'hidden'}>🔁</span>
+                                )}
+                                {todo.title}
+                              </span>
                             )}
-                            {todo.title}
-                          </span>
-                        )}
-                        {/* 수정 버튼 — 활성 시에만 공간 차지 */}
-                        <button
-                          onClick={e => { e.stopPropagation(); startEditTodo(todo) }}
-                          className={`flex-shrink-0 p-0.5 rounded items-center justify-center ${isMobile ? (activeTodoId === todo.id ? 'flex' : 'hidden') : 'hidden group-hover:flex'}`}
-                          style={{ color: 'var(--text-dim)', cursor: 'pointer', opacity: 0.6 }}
-                          title="수정"
-                          onMouseEnter={e => {
-                            e.currentTarget.style.color = 'var(--accent-light)'
-                            e.currentTarget.style.background = 'var(--accent-dim)'
-                            e.currentTarget.style.opacity = '1'
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.color = 'var(--text-dim)'
-                            e.currentTarget.style.background = 'transparent'
-                            e.currentTarget.style.opacity = '0.6'
-                          }}
-                        >
-                          <Pencil size={11} />
-                        </button>
-                        {/* 긴급 버튼 — 활성 시에만 공간 차지, urgent 상태는 체크박스로 표시 */}
-                        <button
-                          onClick={e => { e.stopPropagation(); toggleUrgent(todo.id, todo.urgent) }}
-                          className={`flex-shrink-0 p-0.5 rounded items-center justify-center ${isMobile ? (activeTodoId === todo.id ? 'flex' : 'hidden') : 'hidden group-hover:flex'}`}
-                          style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)', cursor: 'pointer', opacity: todo.urgent ? 1 : 0.6 }}
-                          title={todo.urgent ? '긴급 해제' : '긴급 표시'}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.color = '#ef4444'
-                            e.currentTarget.style.background = 'rgba(239,68,68,0.12)'
-                            e.currentTarget.style.opacity = '1'
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.color = todo.urgent ? '#ef4444' : 'var(--text-dim)'
-                            e.currentTarget.style.background = 'transparent'
-                            e.currentTarget.style.opacity = todo.urgent ? '1' : '0.6'
-                          }}
-                        >
-                          <AlertCircle size={13} />
-                        </button>
-                        {/* 삭제 버튼 — 활성 시에만 공간 차지 */}
-                        <button
-                          onClick={e => { e.stopPropagation(); deleteTodo(todo.id) }}
-                          className={`flex-shrink-0 p-0.5 rounded items-center justify-center ${isMobile ? (activeTodoId === todo.id ? 'flex' : 'hidden') : 'hidden group-hover:flex'}`}
-                          style={{ color: 'var(--text-dim)', cursor: 'pointer', opacity: 0.7 }}
-                          title="삭제"
-                          onMouseEnter={e => {
-                            e.currentTarget.style.color = '#ef4444'
-                            e.currentTarget.style.background = 'rgba(239,68,68,0.12)'
-                            e.currentTarget.style.opacity = '1'
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.color = 'var(--text-dim)'
-                            e.currentTarget.style.background = 'transparent'
-                            e.currentTarget.style.opacity = '0.7'
-                          }}
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ))}
+                          </div>
+                          {/* Row 2: 액션 버튼 (클릭 활성 시) */}
+                          {isActive && (
+                            <div className="flex items-center gap-1 pl-4 pt-0.5 flex-wrap">
+                              <button
+                                onClick={e => { e.stopPropagation(); startEditTodo(todo); setActiveTodoId(null) }}
+                                className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5"
+                                style={{ color: 'var(--text-dim)', background: 'var(--bg-input)', border: '1px solid var(--border)' }}
+                              >
+                                <Pencil size={9} />수정
+                              </button>
+                              <button
+                                onClick={e => { e.stopPropagation(); toggleUrgent(todo.id, todo.urgent) }}
+                                className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5"
+                                style={{
+                                  color: todo.urgent ? '#ef4444' : 'var(--text-dim)',
+                                  background: todo.urgent ? 'rgba(239,68,68,0.1)' : 'var(--bg-input)',
+                                  border: `1px solid ${todo.urgent ? 'rgba(239,68,68,0.3)' : 'var(--border)'}`,
+                                }}
+                              >
+                                <AlertCircle size={9} />{todo.urgent ? '긴급해제' : '긴급'}
+                              </button>
+                              {isMobile && todo.date && (
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    const nextDay = addDays(new Date(todo.date!), 1)
+                                    const nextDateStr = format(nextDay, 'yyyy-MM-dd')
+                                    setTodos(prev => prev.map(t => t.id === todo.id ? { ...t, date: nextDay.toISOString() } : t))
+                                    setActiveTodoId(null)
+                                    fetch(`/api/todos/${todo.id}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ date: nextDateStr }),
+                                    }).catch(() => fetchData())
+                                  }}
+                                  className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5"
+                                  style={{ color: 'var(--text-dim)', background: 'var(--bg-input)', border: '1px solid var(--border)' }}
+                                >
+                                  다음날↗
+                                </button>
+                              )}
+                              <button
+                                onClick={e => { e.stopPropagation(); deleteTodo(todo.id); setActiveTodoId(null) }}
+                                className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5"
+                                style={{ color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}
+                              >
+                                <X size={9} />삭제
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                     {isAdding && !isMobile ? (
                       <div className="flex flex-col gap-1 px-1">
                         <div className="flex items-center gap-1.5">
@@ -2031,12 +2054,12 @@ export default function WeeklyBoard() {
         {/* ── 하단 독립 스크롤: 타임라인 ── */}
         <div
           ref={gridScrollRef}
-          style={{ flexShrink: 0, minHeight: '100%', overflowY: 'auto', scrollSnapAlign: 'start' }}
+          style={{ flexShrink: 0, overflowY: 'auto', overflowX: 'clip', scrollSnapAlign: 'start', overscrollBehavior: 'contain' }}
         >
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? mobileCols : gridCols,
-          minWidth: isMobile ? 0 : '760px',
+          gridTemplateColumns: gridCols,
+          minWidth: gridMinWidth,
         }}>
 
           {/* ── Timeline separator ── */}

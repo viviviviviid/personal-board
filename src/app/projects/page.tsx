@@ -84,7 +84,8 @@ export default function ProjectsPage() {
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>{projects.length}개 프로젝트</p>
         </div>
         <button
-          onClick={() => setShowCreateModal(true)}
+          onClick={() => { if (!showCreateModal) setShowCreateModal(true) }}
+          disabled={showCreateModal}
           className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-all"
           style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent)', color: 'var(--accent-light)' }}
         >
@@ -304,25 +305,6 @@ export default function ProjectsPage() {
                   )}
                 </div>
               ))}
-
-              <div>
-                <label className="block text-xs mb-2" style={{ color: 'var(--text-dim)' }}>컬러</label>
-                <div className="flex gap-2 flex-wrap">
-                  {COLOR_OPTIONS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setFormData((f) => ({ ...f, color }))}
-                      className="w-7 h-7 rounded-full transition-all"
-                      style={{
-                        backgroundColor: color,
-                        boxShadow: formData.color === color ? `0 0 0 2px var(--bg-card), 0 0 0 3px ${color}` : 'none',
-                        transform: formData.color === color ? 'scale(1.15)' : 'scale(1)',
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
 
               <div className="flex gap-3 pt-2">
                 <button

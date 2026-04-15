@@ -427,12 +427,22 @@ export default function NotesPage() {
 
   const allRevealed = draftRows.length > 0 && revealedRows.size === draftRows.length
 
+  // 에디터 닫기 — 내용 없으면 자동 삭제
+  const closeEditor = useCallback(() => {
+    clearTimeout(saveTimer.current)
+    if (selected && !draft.content.trim() && !draft.title.trim()) {
+      fetch(`/api/notes/${selected.id}`, { method: 'DELETE' }).catch(() => {})
+      setNotes(prev => prev.filter(n => n.id !== selected.id))
+    }
+    setSelected(null)
+    setShowEditor(false)
+  }, [selected, draft])
+
   // 탭 전환 시 에디터 닫기
   const handleTabChange = (tab: 'notes' | 'vault') => {
+    if (tab !== activeTab && activeTab === 'notes') closeEditor()
     setActiveTab(tab)
-    setShowEditor(false)
     setShowCredEditor(false)
-    setSelected(null)
     setSelectedCred(null)
   }
 
@@ -804,7 +814,7 @@ export default function NotesPage() {
             }}>
               {/* 모바일 뒤로가기 */}
               <button
-                onClick={() => setShowEditor(false)}
+                onClick={closeEditor}
                 className="md:hidden"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 4, display: 'flex' }}
               >

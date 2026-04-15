@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import { ChevronLeft, ChevronDown, ChevronRight, Plus, Check, X, Target, Trash2, Pencil, Calendar } from 'lucide-react'
+import { ChevronLeft, ChevronDown, ChevronRight, Plus, Check, X, Target, Trash2, Pencil, Calendar, AlertCircle } from 'lucide-react'
 import AIPanel from '@/components/AIPanel'
 
 interface Todo {
@@ -12,6 +12,7 @@ interface Todo {
   title: string
   completed: boolean
   priority: string
+  urgent: boolean
   date: string | null
   sectionId: string | null
 }
@@ -62,15 +63,18 @@ function TodoItem({
   onToggle,
   onDelete,
   onUpdate,
+  onToggleUrgent,
 }: {
   todo: Todo
   onToggle: () => void
   onDelete: () => void
   onUpdate: (title: string, date: string | null) => void
+  onToggleUrgent: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(todo.title)
   const [editDate, setEditDate] = useState(todo.date ? todo.date.slice(0, 10) : '')
+  const [active, setActive] = useState(false)
 
   const submit = () => {
     const t = editTitle.trim()
@@ -90,7 +94,6 @@ function TodoItem({
       <div className="flex flex-col gap-1 px-3 py-2">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded border flex-shrink-0" style={{ borderColor: 'var(--border)' }} />
-          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium, opacity: 0.8 }} />
           <input
             type="text"
             value={editTitle}
@@ -103,7 +106,7 @@ function TodoItem({
           <button onClick={submit} style={{ color: 'var(--accent)' }}><Check size={14} /></button>
           <button onClick={cancel} style={{ color: 'var(--text-dim)' }}><X size={14} /></button>
         </div>
-        <div className="flex items-center gap-2 pl-8">
+        <div className="flex items-center gap-2 pl-6">
           <Calendar size={11} style={{ color: 'var(--text-dim)' }} />
           <input
             type="date"
@@ -128,56 +131,66 @@ function TodoItem({
 
   return (
     <div
-      className="flex items-center gap-2 group px-3 py-1.5 rounded-lg transition-all"
-      onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
-      onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+      className="flex flex-col px-3 py-1.5 rounded-lg transition-all"
+      style={{ background: active ? 'var(--bg-hover)' : 'transparent' }}
+      onMouseLeave={() => setActive(false)}
     >
-      <button
-        onClick={onToggle}
-        className="w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all"
-        style={{
-          background: todo.completed ? 'var(--accent-dim)' : 'transparent',
-          borderColor: todo.completed ? 'var(--accent)' : 'var(--border)',
-        }}
-      >
-        {todo.completed && <Check size={10} style={{ color: 'var(--accent-light)' }} />}
-      </button>
-      <div
-        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-        style={{ background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium, opacity: todo.completed ? 0.3 : 0.8 }}
-      />
-      <span
-        className="flex-1 text-sm"
-        style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
-      >
-        {todo.title}
-      </span>
-      {todo.date && (
-        <span
-          className="text-[10px] px-1.5 py-0.5 rounded-md flex-shrink-0"
-          style={{ background: 'var(--bg-input)', color: 'var(--text-dim)', border: '1px solid var(--border-dim)' }}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onToggle}
+          className="w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all"
+          style={{
+            background: todo.completed ? 'var(--accent-dim)' : todo.urgent ? 'rgba(239,68,68,0.12)' : 'transparent',
+            borderColor: todo.completed ? 'var(--accent)' : todo.urgent ? '#ef4444' : 'var(--border)',
+          }}
         >
-          {format(new Date(todo.date), 'MM/dd')}
+          {todo.completed && <Check size={10} style={{ color: 'var(--accent-light)' }} />}
+        </button>
+        <span
+          className="flex-1 text-sm cursor-pointer"
+          style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
+          onClick={() => setActive(a => !a)}
+        >
+          {todo.title}
         </span>
+        {todo.date && (
+          <span
+            className="text-[10px] px-1.5 py-0.5 rounded-md flex-shrink-0"
+            style={{ background: 'var(--bg-input)', color: 'var(--text-dim)', border: '1px solid var(--border-dim)' }}
+          >
+            {format(new Date(todo.date), 'MM/dd')}
+          </span>
+        )}
+      </div>
+      {active && (
+        <div className="flex items-center gap-1.5 pl-6 pt-1">
+          <button
+            onClick={() => { setEditing(true); setActive(false) }}
+            className="p-1 rounded text-[11px] flex items-center gap-1"
+            style={{ color: 'var(--text-dim)', background: 'var(--bg-input)', border: '1px solid var(--border)' }}
+          >
+            <Pencil size={10} />수정
+          </button>
+          <button
+            onClick={() => { onToggleUrgent(); setActive(false) }}
+            className="p-1 rounded text-[11px] flex items-center gap-1"
+            style={{
+              color: todo.urgent ? '#ef4444' : 'var(--text-dim)',
+              background: todo.urgent ? 'rgba(239,68,68,0.1)' : 'var(--bg-input)',
+              border: `1px solid ${todo.urgent ? 'rgba(239,68,68,0.3)' : 'var(--border)'}`,
+            }}
+          >
+            <AlertCircle size={10} />{todo.urgent ? '긴급 해제' : '긴급'}
+          </button>
+          <button
+            onClick={() => { onDelete(); setActive(false) }}
+            className="p-1 rounded text-[11px] flex items-center gap-1"
+            style={{ color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}
+          >
+            <Trash2 size={10} />삭제
+          </button>
+        </div>
       )}
-      <button
-        onClick={() => setEditing(true)}
-        className="opacity-0 group-hover:opacity-100 transition-all"
-        style={{ color: 'var(--text-dim)' }}
-        onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent)')}
-        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
-      >
-        <Pencil size={11} />
-      </button>
-      <button
-        onClick={onDelete}
-        className="opacity-0 group-hover:opacity-100 transition-all"
-        style={{ color: 'var(--text-dim)' }}
-        onMouseEnter={e => (e.currentTarget.style.color = 'var(--danger, #ef4444)')}
-        onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-dim)')}
-      >
-        <Trash2 size={12} />
-      </button>
     </div>
   )
 }
@@ -438,6 +451,17 @@ export default function ProjectDetailPage() {
     }).catch(() => fetchProject())
   }
 
+  const toggleUrgent = async (todoId: string, currentUrgent: boolean) => {
+    if (!project) return
+    const update = (t: Todo) => t.id === todoId ? { ...t, urgent: !currentUrgent } : t
+    setProject(p => p ? { ...p, todos: p.todos.map(update), sections: p.sections.map(s => ({ ...s, todos: s.todos.map(update) })) } : p)
+    await fetch(`/api/todos/${todoId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urgent: !currentUrgent }),
+    }).catch(() => fetchProject())
+  }
+
   const deleteTodo = async (todoId: string) => {
     if (!project) return
     setProject(p => p ? {
@@ -452,7 +476,7 @@ export default function ProjectDetailPage() {
     if (!project) return
     const actualSectionId = key === UNSECTIONED ? null : key
     const tempId = `temp-${Date.now()}`
-    const newTodo: Todo = { id: tempId, title, completed: false, priority: 'medium', date, sectionId: actualSectionId }
+    const newTodo: Todo = { id: tempId, title, completed: false, priority: 'medium', urgent: false, date, sectionId: actualSectionId }
 
     setProject(p => p
       ? actualSectionId
@@ -621,6 +645,7 @@ export default function ProjectDetailPage() {
                 onToggle={() => toggleTodo(todo.id, todo.completed)}
                 onDelete={() => deleteTodo(todo.id)}
                 onUpdate={(title, date) => updateTodo(todo.id, title, date)}
+                onToggleUrgent={() => toggleUrgent(todo.id, todo.urgent)}
               />
             ))}
             <AddTodoInline
@@ -654,6 +679,7 @@ export default function ProjectDetailPage() {
                       onToggle={() => toggleTodo(todo.id, todo.completed)}
                       onDelete={() => deleteTodo(todo.id)}
                       onUpdate={(title, date) => updateTodo(todo.id, title, date)}
+                      onToggleUrgent={() => toggleUrgent(todo.id, todo.urgent)}
                     />
                   ))}
                   <AddTodoInline

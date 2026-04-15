@@ -43,7 +43,11 @@ export default function BottomNav() {
     }
   }
 
+  // 2뎁스 이상(예: /projects/[id])에서는 하단 탭 숨김
+  const isDeepPath = /^\/[^/]+\/[^/]+/.test(pathname)
+
   if (isNativeApp) return <SettingsModal isOpen={settingsOpen} onClose={handleSettingsClose} />
+  if (isDeepPath) return null
 
   return (
     <>
