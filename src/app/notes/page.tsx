@@ -133,6 +133,7 @@ export default function NotesPage() {
 
   const scheduleSave = (newDraft: typeof draft) => {
     clearTimeout(saveTimer.current)
+    if (!newDraft.content.trim() && !newDraft.title.trim()) return
     saveTimer.current = setTimeout(async () => {
       if (!selected) return
       setSaving(true)

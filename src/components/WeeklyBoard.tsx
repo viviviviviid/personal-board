@@ -590,6 +590,17 @@ export default function WeeklyBoard() {
     if (!localStorage.getItem('pb-onboarding-done')) setOnboardingDone(false)
   }, [])
 
+  // Click outside → deactivate active todo options
+  useEffect(() => {
+    if (!activeTodoId) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-todo-row]')) setActiveTodoId(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [activeTodoId])
+
   const dismissOnboarding = () => {
     localStorage.setItem('pb-onboarding-done', '1')
     setOnboardingDone(true)
@@ -703,15 +714,22 @@ export default function WeeklyBoard() {
     localStorage.setItem('board-mobile-cols', String(n))
   }
 
-  // Persist desktopDayCols
+  // Auto-detect desktopDayCols from window width
   useEffect(() => {
-    const saved = localStorage.getItem('board-desktop-cols')
-    if (saved && [3, 5, 7].includes(Number(saved))) setDesktopDayCols(Number(saved))
-  }, [])
+    if (isMobile) return
+    const update = () => {
+      const w = window.innerWidth
+      if (w < 700) setDesktopDayCols(3)
+      else if (w < 1100) setDesktopDayCols(5)
+      else setDesktopDayCols(7)
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [isMobile])
 
   const setDesktopDayColsPersist = (n: number) => {
     setDesktopDayCols(n)
-    localStorage.setItem('board-desktop-cols', String(n))
   }
 
   // Current time
@@ -790,11 +808,6 @@ export default function WeeklyBoard() {
 
     const timer = setTimeout(() => {
       el.scrollTo({ top: scrollY, behavior: 'instant' as ScrollBehavior })
-      // 오늘이 이번 주에 있으면 타임라인 섹션이 보이도록 외부 컨테이너도 스크롤
-      if (todayInWeek && outerScrollRef.current && topSectionRef.current) {
-        const topH = topSectionRef.current.offsetHeight
-        outerScrollRef.current.scrollTo({ top: topH, behavior: 'instant' as ScrollBehavior })
-      }
     }, 30)
     return () => clearTimeout(timer)
   }, [currentWeekStart, mobileDay, loading])
@@ -1733,11 +1746,11 @@ export default function WeeklyBoard() {
         ref={outerScrollRef}
         key={currentWeekStart.toISOString()}
         className={`flex-1 flex flex-col rounded-xl${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
-        style={{ minWidth: 0, border: '1px solid var(--border)', overflowX: 'auto', overflowY: 'auto', scrollSnapType: 'y proximity' }}
+        style={{ minWidth: 0, border: '1px solid var(--border)', overflowX: 'auto', overflowY: 'hidden' }}
         onAnimationEnd={() => setSlideDir(null)}
       >
         {/* ── 상단 고정: 헤더 + 하이라이트 + TO-DO ── */}
-        <div ref={topSectionRef} style={{ flexShrink: 0, scrollSnapAlign: 'start' }}>
+        <div ref={topSectionRef} style={{ flexShrink: 0 }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: gridCols,
@@ -1865,6 +1878,7 @@ export default function WeeklyBoard() {
                       return (
                         <div
                           key={todo.id}
+                          data-todo-row
                           className="flex flex-col px-1 py-1 rounded transition-colors"
                           style={{ background: isActive ? 'var(--bg-hover)' : 'transparent' }}
                           onClick={e => e.stopPropagation()}
@@ -2054,7 +2068,7 @@ export default function WeeklyBoard() {
         {/* ── 하단 독립 스크롤: 타임라인 ── */}
         <div
           ref={gridScrollRef}
-          style={{ flexShrink: 0, overflowY: 'auto', overflowX: 'clip', scrollSnapAlign: 'start', overscrollBehavior: 'contain' }}
+          style={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'visible', overscrollBehavior: 'contain' }}
         >
         <div style={{
           display: 'grid',
