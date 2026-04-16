@@ -827,7 +827,7 @@ export default function NotesPage() {
           minWidth: 0,
           background: 'var(--bg-base)',
         }}
-        className="md:!flex"
+        className={activeTab === 'notes' ? 'md:!flex' : 'md:!hidden'}
       >
         {activeTab === 'notes' && selected ? (
           <>
@@ -981,7 +981,7 @@ export default function NotesPage() {
           minWidth: 0,
           background: 'var(--bg-base)',
         }}
-        className="md:!flex"
+        className={activeTab === 'vault' ? 'md:!flex' : 'md:!hidden'}
       >
         {activeTab === 'vault' && selectedCred ? (
           <>
