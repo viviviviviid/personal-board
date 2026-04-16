@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday, addMonths, subMonths, startOfMonth } from 'date-fns'
+import { useSidebar } from '@/context/SidebarContext'
 import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink, AlertCircle, Pencil } from 'lucide-react'
 import { signIn } from 'next-auth/react'
 import AIPanel from './AIPanel'
@@ -540,6 +541,8 @@ export default function WeeklyBoard() {
   const [monthCount, setMonthCount] = useState<1 | 2 | 3>(1)
   const [mobileDayCols, setMobileDayCols] = useState(2)
   const [desktopDayCols, setDesktopDayCols] = useState(7)
+  const [desktopViewStart, setDesktopViewStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
+  const { isCollapsed } = useSidebar()
   const [todos, setTodos] = useState<Todo[]>([])
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([])
@@ -714,19 +717,27 @@ export default function WeeklyBoard() {
     localStorage.setItem('board-mobile-cols', String(n))
   }
 
-  // Auto-detect desktopDayCols from window width
+  // Auto-detect desktopDayCols from content width (window - sidebar)
   useEffect(() => {
     if (isMobile) return
     const update = () => {
-      const w = window.innerWidth
-      if (w < 700) setDesktopDayCols(3)
-      else if (w < 1100) setDesktopDayCols(5)
+      const sidebarW = isCollapsed ? 48 : 240
+      const contentW = window.innerWidth - sidebarW
+      if (contentW < 650) setDesktopDayCols(3)
+      else if (contentW < 1050) setDesktopDayCols(5)
       else setDesktopDayCols(7)
     }
     update()
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
-  }, [isMobile])
+  }, [isMobile, isCollapsed])
+
+  // 7-col 또는 모바일에서는 desktopViewStart를 currentWeekStart에 동기화
+  useEffect(() => {
+    if (desktopDayCols === 7 || isMobile) {
+      setDesktopViewStart(currentWeekStart)
+    }
+  }, [currentWeekStart, desktopDayCols, isMobile])
 
   const setDesktopDayColsPersist = (n: number) => {
     setDesktopDayCols(n)
@@ -748,8 +759,13 @@ export default function WeeklyBoard() {
 
   const navigateWeek = useCallback((dir: 'next' | 'prev') => {
     setSlideDir(dir)
-    setCurrentWeekStart(d => dir === 'next' ? addWeeks(d, 1) : subWeeks(d, 1))
-  }, [])
+    if (!isMobile && desktopDayCols < 7) {
+      // 5/3-col: 슬라이딩 윈도우 — desktopDayCols 일만큼 이동
+      setDesktopViewStart(d => dir === 'next' ? addDays(d, desktopDayCols) : addDays(d, -desktopDayCols))
+    } else {
+      setCurrentWeekStart(d => dir === 'next' ? addWeeks(d, 1) : subWeeks(d, 1))
+    }
+  }, [isMobile, desktopDayCols])
 
   const navigateDay = useCallback((dir: 'next' | 'prev') => {
     if (!isMobile) {
@@ -858,12 +874,16 @@ export default function WeeklyBoard() {
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const wp = format(currentWeekStart, 'yyyy-MM-dd')
-      const timeMin = currentWeekStart.toISOString()
-      const timeMax = addDays(currentWeekStart, 7).toISOString()
+      const isSliding = !isMobile && desktopDayCols < 7
+      const rangeStart = isSliding ? desktopViewStart : currentWeekStart
+      const rangeLen = isSliding ? desktopDayCols : 7
+      const startStr = format(rangeStart, 'yyyy-MM-dd')
+      const endStr = format(addDays(rangeStart, rangeLen - 1), 'yyyy-MM-dd')
+      const timeMin = rangeStart.toISOString()
+      const timeMax = addDays(rangeStart, rangeLen).toISOString()
 
-      // 하이라이트 fetch (weekly view용)
-      fetch(`/api/daily-highlight?week=${wp}`)
+      // 하이라이트 fetch — week 파라미터로 rangeStart부터 7일 커버
+      fetch(`/api/daily-highlight?week=${startStr}`)
         .then(r => r.ok ? r.json() : [])
         .then(setHighlights)
         .catch(() => {})
@@ -879,8 +899,8 @@ export default function WeeklyBoard() {
         : Promise.resolve(null)
 
       const [tr, tl, gc] = await Promise.all([
-        fetch(`/api/todos?week=${wp}`),
-        fetch(`/api/timeline?week=${wp}`),
+        fetch(`/api/todos?startDate=${startStr}&endDate=${endStr}`),
+        fetch(`/api/timeline?startDate=${startStr}&endDate=${endStr}`),
         gcPromise,
       ])
       if (tr.ok) setTodos(await tr.json())
@@ -897,7 +917,7 @@ export default function WeeklyBoard() {
     } finally {
       setLoading(false)
     }
-  }, [currentWeekStart, weeklyEnabledCals, calendarList])
+  }, [currentWeekStart, desktopViewStart, desktopDayCols, isMobile, weeklyEnabledCals, calendarList])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -1215,7 +1235,9 @@ export default function WeeklyBoard() {
     const dayStr = format(day, 'yyyy-MM-dd')
     return googleEvents.filter(e => e.allDay && !!e.start.date && !!e.end.date && e.start.date <= dayStr && dayStr < e.end.date)
   }
-  const weekLabel = `${format(currentWeekStart, 'yyyy.MM.dd')} — ${format(addDays(currentWeekStart, 6), 'MM.dd')}`
+  const weekLabel = (!isMobile && desktopDayCols < 7)
+    ? `${format(desktopViewStart, 'yyyy.MM.dd')} — ${format(addDays(desktopViewStart, desktopDayCols - 1), 'MM.dd')}`
+    : `${format(currentWeekStart, 'yyyy.MM.dd')} — ${format(addDays(currentWeekStart, 6), 'MM.dd')}`
   const monthLabel = monthCount === 1
     ? format(currentMonth, 'yyyy년 M월')
     : `${format(currentMonth, 'yyyy.MM')} — ${format(addMonths(currentMonth, monthCount - 1), 'yyyy.MM')}`
@@ -1223,7 +1245,9 @@ export default function WeeklyBoard() {
   const mobileStart = isMobile ? Math.min(mobileDay, Math.max(0, 7 - mobileDayCols)) : 0
   const visibleDays = isMobile
     ? weekDays.slice(mobileStart, mobileStart + mobileDayCols)
-    : weekDays.slice(0, desktopDayCols)
+    : desktopDayCols < 7
+      ? Array.from({ length: desktopDayCols }, (_, i) => addDays(desktopViewStart, i))
+      : weekDays.slice(0, 7)
   const colCount = visibleDays.length
   const gridCols = `32px repeat(${colCount}, minmax(0, 1fr))`
   const gridMinWidth = isMobile ? 0 : Math.max(320, colCount * 130 + 32)
@@ -1403,7 +1427,11 @@ export default function WeeklyBoard() {
               <ChevronLeft size={isMobile ? 18 : 15} />
             </button>
             <button
-              onClick={() => setCurrentWeekStart(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+              onClick={() => {
+                const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+                setCurrentWeekStart(weekStart)
+                setDesktopViewStart(weekStart)
+              }}
               className="rounded-lg transition-all"
               style={{
                 background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)',
@@ -1746,7 +1774,7 @@ export default function WeeklyBoard() {
 
       {view === 'weekly' && <div
         ref={outerScrollRef}
-        key={currentWeekStart.toISOString()}
+        key={(!isMobile && desktopDayCols < 7 ? desktopViewStart : currentWeekStart).toISOString()}
         className={`flex-1 flex flex-col rounded-xl${slideDir === 'next' ? ' week-slide-next' : slideDir === 'prev' ? ' week-slide-prev' : ''}`}
         style={{ minWidth: 0, border: '1px solid var(--border)', overflowX: 'auto', overflowY: 'auto' }}
         onAnimationEnd={() => setSlideDir(null)}
