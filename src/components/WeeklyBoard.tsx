@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { useSidebar } from '@/context/SidebarContext'
-import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink, AlertCircle, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink, AlertCircle } from 'lucide-react'
 import { signIn } from 'next-auth/react'
 import AIPanel from './AIPanel'
 import MonthlyCalendar from './MonthlyCalendar'
@@ -62,6 +62,7 @@ interface TimelineEntry {
 // ── Constants ──────────────────────────────────────────────────────────────
 const HOURS = Array.from({ length: LAST_HOUR - FIRST_HOUR + 1 }, (_, i) => i + FIRST_HOUR)
 const DAYS_KO = ['월', '화', '수', '목', '금', '토', '일']
+const dayOfWeekIdx = (d: Date) => { const g = d.getDay(); return g === 0 ? 6 : g - 1 }
 
 // Obsidian category colors
 const CAT_STYLE: Record<string, { bg: string; text: string; border: string }> = {
@@ -572,6 +573,7 @@ export default function WeeklyBoard() {
   const [editingTodoId, setEditingTodoId] = useState<string | null>(null)
   const [editingTodoTitle, setEditingTodoTitle] = useState('')
   const [activeTodoId, setActiveTodoId] = useState<string | null>(null)
+  const [expandedTodoDays, setExpandedTodoDays] = useState<Set<string>>(new Set())
   const [selectedEntry, setSelectedEntry] = useState<{ entry: TimelineEntry; rect: DOMRect } | null>(null)
   const [addingEntry, setAddingEntry] = useState<{ dateKey: string; hour: number; startTime?: string } | null>(null)
   const [newEntry, setNewEntry] = useState({ title: '', endTime: '', category: '' })
@@ -723,8 +725,8 @@ export default function WeeklyBoard() {
     const update = () => {
       const sidebarW = isCollapsed ? 48 : 240
       const contentW = window.innerWidth - sidebarW
-      if (contentW < 650) setDesktopDayCols(3)
-      else if (contentW < 1050) setDesktopDayCols(5)
+      if (contentW < 850) setDesktopDayCols(3)
+      else if (contentW < 1300) setDesktopDayCols(5)
       else setDesktopDayCols(7)
     }
     update()
@@ -1792,13 +1794,13 @@ export default function WeeklyBoard() {
             style={{ background: 'var(--bg-surface)', borderBottom: '1px solid var(--border)' }}
           />
           {visibleDays.map((day) => {
-            const wi = weekDays.indexOf(day)
+            const wi = dayOfWeekIdx(day)
             const today = isToday(day)
             const dayKey = format(day, 'yyyy-MM-dd')
             const hasHighlight = highlights.some(x => x.date === dayKey)
             return (
               <div
-                key={wi}
+                key={dayKey}
                 className="px-2 py-2"
                 style={{
                   background: today ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-surface)',
@@ -1876,14 +1878,14 @@ export default function WeeklyBoard() {
             <span className="text-[9px] font-semibold leading-tight text-center" style={{ color: 'var(--text-dim)' }}>TO<br/>DO</span>
           </div>
           {visibleDays.map((day) => {
-            const wi = weekDays.indexOf(day)
+            const wi = dayOfWeekIdx(day)
             const dayKey = format(day, 'yyyy-MM-dd')
             const dayTodos = todosForDay(day)
             const isAdding = addingTodoDay === dayKey
             const today = isToday(day)
             return (
               <div
-                key={wi}
+                key={dayKey}
                 className="p-1.5"
                 style={{
                   background: today ? 'rgba(139, 92, 246, 0.05)' : 'var(--bg-card)',
@@ -1902,8 +1904,14 @@ export default function WeeklyBoard() {
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-0" onClick={() => setActiveTodoId(null)}>
-                    {dayTodos.map(todo => {
+                  <div className="space-y-0" onClick={() => { setActiveTodoId(null); setEditingTodoId(null) }}>
+                    {(() => {
+                      const MAX = 6
+                      const expanded = expandedTodoDays.has(dayKey)
+                      const displayTodos = expanded ? dayTodos : dayTodos.slice(0, MAX)
+                      const hiddenCount = dayTodos.length - MAX
+                      return <>
+                        {displayTodos.map(todo => {
                       const isActive = activeTodoId === todo.id
                       return (
                         <div
@@ -1946,7 +1954,7 @@ export default function WeeklyBoard() {
                               <span
                                 className="text-[12px] leading-snug flex-1 min-w-0 break-words cursor-pointer"
                                 style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
-                                onClick={e => { e.stopPropagation(); setActiveTodoId(isActive ? null : todo.id) }}
+                                onClick={e => { e.stopPropagation(); startEditTodo(todo); setActiveTodoId(todo.id) }}
                               >
                                 {todo.recurringRuleId && (
                                   <span style={{ fontSize: 9, opacity: 0.55, marginRight: 2 }} className={isActive ? 'inline' : 'hidden'}>🔁</span>
@@ -1958,13 +1966,6 @@ export default function WeeklyBoard() {
                           {/* Row 2: 액션 버튼 (클릭 활성 시) */}
                           {isActive && (
                             <div className="flex items-center gap-1 pl-4 pt-0.5 flex-wrap">
-                              <button
-                                onClick={e => { e.stopPropagation(); startEditTodo(todo); setActiveTodoId(null) }}
-                                className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5"
-                                style={{ color: 'var(--text-dim)', background: 'var(--bg-input)', border: '1px solid var(--border)' }}
-                              >
-                                <Pencil size={9} />수정
-                              </button>
                               <button
                                 onClick={e => { e.stopPropagation(); toggleUrgent(todo.id, todo.urgent) }}
                                 className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-0.5"
@@ -2008,6 +2009,26 @@ export default function WeeklyBoard() {
                         </div>
                       )
                     })}
+                        {!expanded && hiddenCount > 0 && (
+                          <button
+                            onClick={e => { e.stopPropagation(); setExpandedTodoDays(prev => new Set(prev).add(dayKey)) }}
+                            className="text-[10px] px-1.5 py-1 rounded w-full text-center transition-colors"
+                            style={{ color: 'var(--text-dim)', background: 'var(--bg-hover)', border: '1px dashed var(--border)', cursor: 'pointer' }}
+                          >
+                            더보기 (+{hiddenCount})
+                          </button>
+                        )}
+                        {expanded && hiddenCount > 0 && (
+                          <button
+                            onClick={e => { e.stopPropagation(); setExpandedTodoDays(prev => { const n = new Set(prev); n.delete(dayKey); return n }) }}
+                            className="text-[10px] px-1.5 py-0.5 rounded w-full text-center transition-colors"
+                            style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
+                          >
+                            접기
+                          </button>
+                        )}
+                      </>
+                    })()}
                     {isAdding && !isMobile ? (
                       <div className="flex flex-col gap-1 px-1">
                         <div className="flex items-center gap-1.5">
@@ -2117,6 +2138,33 @@ export default function WeeklyBoard() {
             </span>
           </div>
 
+          {/* ── Timeline date headers ── */}
+          <div style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', position: 'sticky', top: 24, zIndex: 19 }} />
+          {visibleDays.map(day => {
+            const dKey = format(day, 'yyyy-MM-dd')
+            const td = isToday(day)
+            const dwi = dayOfWeekIdx(day)
+            return (
+              <div
+                key={`tl-hdr-${dKey}`}
+                className="flex items-center justify-center gap-1 py-1"
+                style={{
+                  background: td ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-surface)',
+                  borderLeft: '1px solid var(--border)',
+                  borderBottom: '1px solid var(--border-dim)',
+                  position: 'sticky', top: 24, zIndex: 19,
+                }}
+              >
+                <span className="text-[10px] font-semibold" style={{ color: td ? 'var(--accent)' : dwi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}>
+                  {DAYS_KO[dwi]}
+                </span>
+                <span className="text-[10px] font-medium" style={{ color: td ? 'var(--accent-light)' : 'var(--text-dim)' }}>
+                  {format(day, 'd')}
+                </span>
+              </div>
+            )
+          })}
+
           {/* ── All-day events row ── */}
           {visibleDays.some(day => allDayGoogleEventsForDay(day).length > 0) && (
             <>
@@ -2165,8 +2213,7 @@ export default function WeeklyBoard() {
           </div>
 
           {/* ── Day columns ── */}
-          {visibleDays.map((day) => {
-            const di = weekDays.indexOf(day)
+          {visibleDays.map((day, colIdx) => {
             const dateKey = format(day, 'yyyy-MM-dd')
             const dayEntries = entriesForDay(day)
             const dayGoogleEvents = googleEventsForDay(day)
@@ -2182,8 +2229,8 @@ export default function WeeklyBoard() {
 
             return (
               <div
-                key={di}
-                ref={el => { columnRefs.current[di] = el }}
+                key={dateKey}
+                ref={el => { columnRefs.current[colIdx] = el }}
                 style={{
                   position: 'relative', height: TOTAL_H,
                   background: today ? 'rgba(139, 92, 246, 0.04)' : 'var(--bg-surface)',
@@ -2309,11 +2356,11 @@ export default function WeeklyBoard() {
                   const formHeight = Math.max(ROW_H / 2, timeToY(formEndTime) - formTopY)
 
                   // tooltip position (fixed) — read column rect at render time
-                  const colRect = columnRefs.current[di]?.getBoundingClientRect()
+                  const colRect = columnRefs.current[colIdx]?.getBoundingClientRect()
                   const tipW = 192
                   const rawTipTop = colRect ? colRect.top + formTopY : formTopY
                   const tipTop = Math.max(8, Math.min(rawTipTop, window.innerHeight - 300))
-                  const flipLeft = colRect ? colRect.right + 4 + tipW > window.innerWidth : di >= 5
+                  const flipLeft = colRect ? colRect.right + 4 + tipW > window.innerWidth : colIdx >= 5
                   const rawTipLeft = colRect
                     ? flipLeft ? colRect.left - tipW - 4 : colRect.right + 4
                     : 0
