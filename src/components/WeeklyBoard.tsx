@@ -534,7 +534,7 @@ function GoogleEventBlock({ event, layoutCol = 0, layoutTotal = 1, effectiveStar
 
 // ── Main component ─────────────────────────────────────────────────────────
 export default function WeeklyBoard() {
-  const [view, setView] = useState<'weekly' | 'monthly' | 'matrix'>('weekly')
+  const [view, setView] = useState<'weekly' | 'monthly'>('weekly')
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     startOfWeek(new Date(), { weekStartsOn: 1 })
   )
@@ -846,7 +846,7 @@ export default function WeeklyBoard() {
   // 좌우 화살표 키로 주 이동
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (view !== 'weekly' && view !== 'matrix') return
+      if (view !== 'weekly') return
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === 'ArrowLeft') navigateWeek('prev')
@@ -924,18 +924,6 @@ export default function WeeklyBoard() {
   useEffect(() => { fetchData() }, [fetchData])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const moveTodo = async (id: string, urgent: boolean, important: boolean) => {
-    const todo = todos.find(t => t.id === id)
-    if (!todo) return
-    const newPriority = important ? 'high' : todo.priority === 'high' ? 'medium' : todo.priority
-    setTodos(prev => prev.map(t => t.id === id ? { ...t, urgent, priority: newPriority } : t))
-    await fetch(`/api/todos/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urgent, priority: newPriority }),
-    }).catch(() => fetchData())
-  }
-
   const toggleUrgent = async (id: string, urgent: boolean) => {
     setTodos(prev => prev.map(t => t.id === id ? { ...t, urgent: !urgent } : t))
     await fetch(`/api/todos/${id}`, {
@@ -1301,7 +1289,7 @@ export default function WeeklyBoard() {
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {/* View toggle */}
             <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-              {(['weekly', 'monthly', 'matrix'] as const).map((v, i) => (
+              {(['weekly', 'monthly'] as const).map((v, i) => (
                 <button
                   key={v}
                   onClick={() => setView(v)}
@@ -1309,12 +1297,12 @@ export default function WeeklyBoard() {
                   style={{
                     background: view === v ? 'var(--accent-dim)' : 'var(--bg-card)',
                     color: view === v ? 'var(--accent-light)' : 'var(--text-muted)',
-                    borderRight: i < 2 ? '1px solid var(--border)' : 'none',
+                    borderRight: i < 1 ? '1px solid var(--border)' : 'none',
                   }}
                 >
                   {isMobile
-                    ? (v === 'weekly' ? '주' : v === 'monthly' ? '월' : 'M')
-                    : (v === 'weekly' ? '주간' : v === 'monthly' ? '월간' : '매트릭스')}
+                    ? (v === 'weekly' ? '주' : '월')
+                    : (v === 'weekly' ? '주간' : '월간')}
                 </button>
               ))}
             </div>
@@ -1416,7 +1404,7 @@ export default function WeeklyBoard() {
         </div>
 
         {/* Row 2: Navigation */}
-        {(view === 'weekly' || view === 'matrix') && (
+        {view === 'weekly' && (
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => navigateWeek('prev')}
@@ -1543,19 +1531,6 @@ export default function WeeklyBoard() {
           </div>
         )}
       </div>
-
-      {/* ── 매트릭스 뷰 ────────────────────────────────────────────────────── */}
-      {view === 'matrix' && (
-        <MatrixView
-          todos={todos}
-          weekLabel={weekLabel}
-          onToggle={toggleTodo}
-          onToggleUrgent={toggleUrgent}
-          onDelete={deleteTodo}
-          onMove={moveTodo}
-          isMobile={isMobile}
-        />
-      )}
 
       {view === 'monthly' && (
         <div
@@ -2663,186 +2638,3 @@ function HighlightCell({
   )
 }
 
-// ── Matrix view ─────────────────────────────────────────────────────────────
-const QUADRANTS = [
-  { label: '지금 해', sub: '긴급 + 중요', urgent: true, important: true, color: '#ef4444', bg: 'rgba(239,68,68,0.06)' },
-  { label: '일정 잡기', sub: '중요, 긴급 아님', urgent: false, important: true, color: '#3b82f6', bg: 'rgba(59,130,246,0.06)' },
-  { label: '위임', sub: '긴급, 중요 아님', urgent: true, important: false, color: '#f59e0b', bg: 'rgba(245,158,11,0.06)' },
-  { label: '제거', sub: '긴급 아님, 중요 아님', urgent: false, important: false, color: '#6b7280', bg: 'rgba(107,114,128,0.04)' },
-]
-
-function MatrixView({
-  todos, weekLabel, isMobile,
-  onToggle, onToggleUrgent, onDelete, onMove,
-}: {
-  todos: Todo[]
-  weekLabel: string
-  isMobile: boolean
-  onToggle: (id: string, completed: boolean) => void
-  onToggleUrgent: (id: string, urgent: boolean) => void
-  onDelete: (id: string) => void
-  onMove: (id: string, urgent: boolean, important: boolean) => void
-}) {
-  const [dragOver, setDragOver] = useState<number | null>(null)
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-
-  const classify = (t: Todo) => ({ urgent: t.urgent, important: t.priority === 'high' })
-
-  const handleDragStart = (e: React.DragEvent, todoId: string) => {
-    e.dataTransfer.setData('todoId', todoId)
-    e.dataTransfer.effectAllowed = 'move'
-    setDraggingId(todoId)
-  }
-
-  const handleDrop = (e: React.DragEvent, qi: number) => {
-    e.preventDefault()
-    const todoId = e.dataTransfer.getData('todoId')
-    const q = QUADRANTS[qi]
-    if (todoId) onMove(todoId, q.urgent, q.important)
-    setDragOver(null)
-    setDraggingId(null)
-  }
-
-  return (
-    <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-      {/* 축 라벨 — 데스크탑만 */}
-      {!isMobile && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', marginBottom: 2 }}>
-          <div className="text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>긴급함</div>
-          <div className="text-center text-[10px] font-semibold" style={{ color: 'var(--text-dim)' }}>긴급하지 않음</div>
-        </div>
-      )}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-          gridTemplateRows: isMobile ? 'none' : '1fr 1fr',
-          gap: 8,
-          flex: isMobile ? undefined : 1,
-          overflow: isMobile ? 'auto' : 'hidden',
-        }}
-      >
-        {QUADRANTS.map((q, qi) => {
-          const items = todos.filter(t => {
-            const c = classify(t)
-            return c.urgent === q.urgent && c.important === q.important
-          })
-          const isOver = dragOver === qi
-          return (
-            <div
-              key={qi}
-              onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOver(qi) }}
-              onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null) }}
-              onDrop={e => handleDrop(e, qi)}
-              style={{
-                background: isOver ? `${q.color}18` : q.bg,
-                border: `${isOver ? 2 : 1}px solid ${isOver ? q.color : `${q.color}44`}`,
-                borderRadius: 12, overflow: 'hidden',
-                display: 'flex', flexDirection: 'column',
-                transition: 'border 0.1s, background 0.1s',
-              }}
-            >
-              <div style={{ padding: '10px 14px', borderBottom: `1px solid ${q.color}33`, background: `${q.color}10` }}>
-                <div className="flex items-start gap-2">
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: q.color, flexShrink: 0, marginTop: 3 }} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[14px]" style={{ color: q.color }}>{q.label}</span>
-                      {items.length > 0 && (
-                        <span className="ml-auto text-[11px] font-bold" style={{ color: q.color }}>{items.length}</span>
-                      )}
-                    </div>
-                    <span className="text-[11px]" style={{ color: 'var(--text-dim)' }}>{q.sub}</span>
-                  </div>
-                </div>
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '8px 10px' }} className="space-y-1.5">
-                {items.length === 0 ? (
-                  <div
-                    className="text-[13px] text-center pt-6"
-                    style={{ color: isOver ? q.color : 'var(--text-dim)', opacity: isOver ? 0.7 : 0.4 }}
-                  >
-                    {isOver ? '여기에 놓기' : '없음'}
-                  </div>
-                ) : items.map(todo => (
-                  <div
-                    key={todo.id}
-                    draggable
-                    onDragStart={e => handleDragStart(e, todo.id)}
-                    onDragEnd={() => { setDraggingId(null); setDragOver(null) }}
-                    className="flex items-center gap-2 group px-3 py-2 rounded-xl"
-                    style={{
-                      background: 'var(--bg-card)',
-                      opacity: draggingId === todo.id ? 0.4 : 1,
-                      cursor: 'grab',
-                      transition: 'opacity 0.15s',
-                      minHeight: 40,
-                    }}
-                  >
-                    <button
-                      onClick={() => onToggle(todo.id, todo.completed)}
-                      onMouseDown={e => e.stopPropagation()}
-                      className="w-5 h-5 rounded flex-shrink-0 flex items-center justify-center"
-                      style={{
-                        background: todo.completed ? 'var(--accent-dim)' : 'transparent',
-                        border: `1.5px solid ${todo.completed ? 'var(--accent)' : 'var(--border)'}`,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {todo.completed && <Check size={11} style={{ color: 'var(--accent-light)' }} />}
-                    </button>
-                    <div
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ background: PRIORITY_COLOR[todo.priority] ?? PRIORITY_COLOR.medium, opacity: 0.8 }}
-                    />
-                    <span
-                      className="text-[13px] flex-1 truncate"
-                      style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
-                    >
-                      {todo.title}
-                    </span>
-                    {todo.date && (
-                      <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--text-dim)' }}>
-                        {format(new Date(todo.date), 'M/d')}
-                      </span>
-                    )}
-                    <button
-                      onClick={() => onToggleUrgent(todo.id, todo.urgent)}
-                      className={`flex-shrink-0 p-1 rounded transition-all ${todo.urgent ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}
-                      style={{ color: todo.urgent ? '#ef4444' : 'var(--text-dim)', cursor: 'pointer' }}
-                      title={todo.urgent ? '긴급 해제' : '긴급 표시'}
-                    >
-                      <AlertCircle size={15} />
-                    </button>
-                    <button
-                      onClick={() => onDelete(todo.id)}
-                      className="opacity-0 group-hover:opacity-100 flex-shrink-0 p-1 rounded transition-all"
-                      style={{ color: 'var(--text-dim)', cursor: 'pointer' }}
-                      title="삭제"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                ))}
-                {/* 드래그 중 빈 공간에도 drop 가능하도록 패딩 영역 */}
-                {draggingId && items.length > 0 && isOver && (
-                  <div
-                    style={{
-                      height: 40, borderRadius: 10, border: `2px dashed ${q.color}66`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
-                    <span className="text-[12px]" style={{ color: q.color }}>여기에 놓기</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-      <div className="mt-2 text-center text-[10px]" style={{ color: 'var(--text-dim)' }}>
-        {weekLabel} · 카드를 드래그해서 분면 이동 · 중요 = priority high · ! 클릭으로 긴급 표시
-      </div>
-    </div>
-  )
-}
