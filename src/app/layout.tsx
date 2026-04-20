@@ -3,7 +3,7 @@ import { Caveat } from 'next/font/google'
 import './globals.css'
 import Sidebar from '@/components/Sidebar'
 import SidebarWrapper from '@/components/SidebarWrapper'
-import BottomNav from '@/components/BottomNav'
+import NativeAppBridge from '@/components/NativeAppBridge'
 import { SidebarProvider } from '@/context/SidebarContext'
 import { VaultProvider } from '@/context/VaultContext'
 import { AutoFeedbackProvider } from '@/context/AutoFeedbackContext'
@@ -56,8 +56,7 @@ export default function RootLayout({
               {children}
               <PWARegister />
             </SidebarWrapper>
-            {/* 모바일 하단 탭 */}
-            <BottomNav />
+            <NativeAppBridge />
             <AutoFeedbackTrigger />
           </SidebarProvider>
           </VaultProvider>
