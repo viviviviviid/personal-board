@@ -51,6 +51,7 @@ export default function HabitsPage() {
   const [showAddForm, setShowAddForm] = useState(false)
   const [formData, setFormData] = useState({ name: '', emoji: '✨', color: '#c78928' })
   const [adding, setAdding] = useState(false)
+  const [addError, setAddError] = useState<string | null>(null)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
   const [heatmapTooltip, setHeatmapTooltip] = useState<{ date: string; rate: number; x: number; y: number } | null>(null)
@@ -128,18 +129,27 @@ export default function HabitsPage() {
     e.preventDefault()
     if (!formData.name.trim()) return
     setAdding(true)
+    setAddError(null)
     try {
       const res = await fetch('/api/habits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        if (data.code === 'UPGRADE_REQUIRED') {
+          setAddError('프리 플랜은 최대 3개까지 생성할 수 있습니다.')
+        } else {
+          setAddError(data.error || '습관 생성에 실패했습니다.')
+        }
+        return
+      }
       setFormData({ name: '', emoji: '✨', color: '#c78928' })
       setShowAddForm(false)
       fetchHabits()
     } catch {
-      // silent
+      setAddError('네트워크 오류가 발생했습니다.')
     } finally {
       setAdding(false)
     }
@@ -175,7 +185,7 @@ export default function HabitsPage() {
             습관 트래커
           </h2>
           <button
-            onClick={() => setShowAddForm(!showAddForm)}
+            onClick={() => { setShowAddForm(!showAddForm); setAddError(null) }}
             className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-all"
             style={{
               background: showAddForm ? 'var(--bg-card)' : 'var(--accent-dim)',
@@ -249,6 +259,11 @@ export default function HabitsPage() {
           style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
         >
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>새 습관 추가</h3>
+          {addError && (
+            <div className="text-sm p-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger)' }}>
+              {addError}
+            </div>
+          )}
           <div className="flex gap-2">
             <div className="relative" ref={emojiPickerRef}>
               <button

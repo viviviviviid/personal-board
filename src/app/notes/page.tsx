@@ -154,7 +154,8 @@ export default function NotesPage() {
       const note = await res.json()
       setNotes(prev => [note, ...prev])
       openNote(note)
-      // NoteEditor autoFocus handles this
+      const today = new Date().toISOString().slice(0, 10)
+      handleDraftChange('date', today)
     }
   }
 

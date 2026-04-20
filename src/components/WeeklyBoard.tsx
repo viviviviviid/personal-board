@@ -1217,8 +1217,10 @@ export default function WeeklyBoard() {
   }, [fetchData])
 
   // ── Helpers ──────────────────────────────────────────────────────────────
-  const todosForDay = (day: Date) =>
-    todos.filter(t => t.date && isSameDay(new Date(t.date), day))
+  const todosForDay = (day: Date) => {
+    const filtered = todos.filter(t => t.date && isSameDay(new Date(t.date), day))
+    return [...filtered].sort((a, b) => Number(a.completed) - Number(b.completed))
+  }
   const entriesForDay = (day: Date) =>
     timeline.filter(e => isSameDay(new Date(e.date), day))
   const googleEventsForDay = (day: Date) => {
