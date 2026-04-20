@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format } from 'date-fns'
-import { ChevronLeft, ChevronDown, ChevronRight, Plus, Check, X, Target, Trash2, Pencil, Calendar, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronDown, ChevronRight, Plus, Check, X, Target, Trash2, Pencil, Calendar, AlertCircle, MoreHorizontal } from 'lucide-react'
 import AIPanel from '@/components/AIPanel'
 
 interface Todo {
   id: string
   title: string
   completed: boolean
+  completedAt: string | null
   priority: string
   urgent: boolean
   date: string | null
@@ -75,6 +76,18 @@ function TodoItem({
   const [editTitle, setEditTitle] = useState(todo.title)
   const [editDate, setEditDate] = useState(todo.date ? todo.date.slice(0, 10) : '')
   const [active, setActive] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!active) return
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setActive(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [active])
 
   const submit = () => {
     const t = editTitle.trim()
@@ -131,9 +144,9 @@ function TodoItem({
 
   return (
     <div
-      className="flex flex-col px-3 py-1.5 rounded-lg transition-all"
+      ref={containerRef}
+      className="flex flex-col px-3 py-1.5 rounded-lg transition-all group"
       style={{ background: active ? 'var(--bg-hover)' : 'transparent' }}
-      onMouseLeave={() => setActive(false)}
     >
       <div className="flex items-center gap-2">
         <button
@@ -149,7 +162,7 @@ function TodoItem({
         <span
           className="flex-1 text-sm cursor-pointer"
           style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
-          onClick={() => setActive(a => !a)}
+          onClick={() => { setEditing(true); setActive(false) }}
         >
           {todo.title}
         </span>
@@ -161,6 +174,13 @@ function TodoItem({
             {format(new Date(todo.date), 'MM/dd')}
           </span>
         )}
+        <button
+          onClick={() => setActive(a => !a)}
+          className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all"
+          style={{ color: 'var(--text-dim)' }}
+        >
+          <MoreHorizontal size={14} />
+        </button>
       </div>
       {active && (
         <div className="flex items-center gap-1.5 pl-6 pt-1">
@@ -189,6 +209,11 @@ function TodoItem({
           >
             <Trash2 size={10} />삭제
           </button>
+          {todo.completed && todo.completedAt && (
+            <span className="text-[10px] ml-auto" style={{ color: 'var(--text-dim)' }}>
+              완료: {format(new Date(todo.completedAt), 'MM/dd')}
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -432,11 +457,20 @@ export default function ProjectDetailPage() {
     if (!project) return
     const update = (t: Todo) => t.id === todoId ? { ...t, completed: !currentCompleted } : t
     setProject(p => p ? { ...p, todos: p.todos.map(update), sections: p.sections.map(s => ({ ...s, todos: s.todos.map(update) })) } : p)
-    await fetch(`/api/todos/${todoId}`, {
+    const res = await fetch(`/api/todos/${todoId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ completed: !currentCompleted }),
-    }).catch(() => fetchProject())
+    }).catch(() => null)
+    if (res?.ok) {
+      const updated = await res.json().catch(() => null)
+      if (updated) {
+        const sync = (t: Todo) => t.id === todoId ? { ...t, completed: updated.completed, completedAt: updated.completedAt } : t
+        setProject(p => p ? { ...p, todos: p.todos.map(sync), sections: p.sections.map(s => ({ ...s, todos: s.todos.map(sync) })) } : p)
+      }
+    } else if (!res) {
+      fetchProject()
+    }
   }
 
   const updateTodo = async (todoId: string, title: string, date: string | null) => {
@@ -475,7 +509,7 @@ export default function ProjectDetailPage() {
     if (!project) return
     const actualSectionId = key === UNSECTIONED ? null : key
     const tempId = `temp-${Date.now()}`
-    const newTodo: Todo = { id: tempId, title, completed: false, priority: 'medium', urgent: false, date, sectionId: actualSectionId }
+    const newTodo: Todo = { id: tempId, title, completed: false, completedAt: null, priority: 'medium', urgent: false, date, sectionId: actualSectionId }
 
     setProject(p => p
       ? actualSectionId

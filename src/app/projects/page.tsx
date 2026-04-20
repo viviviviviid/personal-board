@@ -27,6 +27,7 @@ export default function ProjectsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [formData, setFormData] = useState({ name: '', description: '', color: '#c78928', goal: '' })
   const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null)
 
   const fetchProjects = async () => {
@@ -48,18 +49,27 @@ export default function ProjectsPage() {
     e.preventDefault()
     if (!formData.name.trim()) return
     setCreating(true)
+    setCreateError(null)
     try {
       const res = await fetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       })
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        if (data.code === 'UPGRADE_REQUIRED') {
+          setCreateError('프리 플랜은 최대 3개까지 생성할 수 있습니다.')
+        } else {
+          setCreateError(data.error || '프로젝트 생성에 실패했습니다.')
+        }
+        return
+      }
       setShowCreateModal(false)
       setFormData({ name: '', description: '', color: '#c78928', goal: '' })
       fetchProjects()
     } catch {
-      // silent
+      setCreateError('네트워크 오류가 발생했습니다.')
     } finally {
       setCreating(false)
     }
@@ -267,7 +277,7 @@ export default function ProjectsPage() {
             >
               <h2 className="text-base font-semibold" style={{ color: 'var(--text-bright)' }}>새 프로젝트</h2>
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => { setShowCreateModal(false); setCreateError(null) }}
                 className="p-1 rounded-lg"
                 style={{ color: 'var(--text-dim)' }}
               >
@@ -276,6 +286,11 @@ export default function ProjectsPage() {
             </div>
 
             <form onSubmit={createProject} className="p-5 space-y-4">
+              {createError && (
+                <div className="p-3 rounded-lg text-sm" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--danger)' }}>
+                  {createError}
+                </div>
+              )}
               {[
                 { label: '프로젝트 이름 *', key: 'name', placeholder: '프로젝트 이름을 입력하세요', type: 'input' },
                 { label: '설명 (선택)', key: 'description', placeholder: '프로젝트 설명...', type: 'textarea' },

@@ -16,7 +16,10 @@ export async function PATCH(
 
     const updateData: Record<string, unknown> = {}
     if (title !== undefined) updateData.title = title
-    if (completed !== undefined) updateData.completed = completed
+    if (completed !== undefined) {
+      updateData.completed = completed
+      updateData.completedAt = completed ? new Date() : null
+    }
     if (date !== undefined) updateData.date = date ? new Date(date) : null
     if (priority !== undefined) updateData.priority = priority
     if (urgent !== undefined) updateData.urgent = urgent

@@ -25,7 +25,7 @@ export default function NoteEditor({ noteId, content, onChange, autoFocus }: Not
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         bulletList: { keepMarks: true, keepAttributes: false },
-        orderedList: { keepMarks: true, keepAttributes: false },
+        orderedList: { keepMarks: false, keepAttributes: false },
       }),
       Markdown.configure({
         html: false,
@@ -49,7 +49,11 @@ export default function NoteEditor({ noteId, content, onChange, autoFocus }: Not
       Typography,
       // 플레이스홀더
       Placeholder.configure({
-        placeholder: '내용을 입력하세요...\n\n# 제목1  ## 제목2  ### 제목3\n- 리스트  - [ ] 체크박스\n**굵게**  *기울임*  ~~취소선~~  ==형광펜==  `코드`',
+        placeholder: ({ editor }) =>
+          editor.isEmpty
+            ? '내용을 입력하세요...\n\n# 제목1  ## 제목2  ### 제목3\n- 리스트  - [ ] 체크박스\n**굵게**  *기울임*  ~~취소선~~  ==형광펜==  `코드`'
+            : '',
+        showOnlyWhenEditable: true,
       }),
     ],
     content,

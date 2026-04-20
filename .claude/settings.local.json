@@ -43,7 +43,15 @@
       "Bash(python3:*)",
       "Bash(grep:*)",
       "Skill(commit-commands:commit)",
-      "Bash(find /home/tyy8282/project/tool/personal-board/src -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec basename {} \\\\;)"
+      "Bash(find /home/tyy8282/project/tool/personal-board/src -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec basename {} \\\\;)",
+      "Bash(npx playwright *)",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(npm test *)",
+      "Bash(service mysql *)",
+      "Bash(DATABASE_URL=\"mysql://root:12345678@127.0.0.1:3306/personal_board\" npx prisma db push)",
+      "Bash(DATABASE_URL=\"mysql://pb_user:pb_strong_password_2024@127.0.0.1:3306/personal_board\" npx prisma *)",
+      "Bash(DATABASE_URL=\"mysql://pb_user:pb_strong_password_2024@127.0.0.1:33060/personal_board\" npx prisma *)"
     ]
   }
 }
