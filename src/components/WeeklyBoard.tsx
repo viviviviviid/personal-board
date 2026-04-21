@@ -215,7 +215,7 @@ function EntryBlock({ entry, onDelete, onDragStart, onSelect, layoutCol = 0, lay
   return (
     <div
       style={{
-        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 10,
+        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 30,
         background: s.bg, border: `1px solid ${s.border}`, color: s.text,
         borderRadius: 6,
       }}
@@ -510,7 +510,7 @@ function GoogleEventBlock({ event, layoutCol = 0, layoutTotal = 1, effectiveStar
   return (
     <div
       style={{
-        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 9,
+        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 29,
         background: `${color}33`,
         border: `1px solid ${color}88`,
         color,
@@ -1778,7 +1778,7 @@ export default function WeeklyBoard() {
         onAnimationEnd={() => setSlideDir(null)}
       >
         {/* ── 상단 고정: 헤더 + 하이라이트 + TO-DO ── */}
-        <div ref={topSectionRef} style={{ flexShrink: 0, position: 'sticky', top: 0, zIndex: 20 }}>
+        <div ref={topSectionRef} style={{ flexShrink: 0, position: 'sticky', top: 0 }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: gridCols,
@@ -2126,7 +2126,7 @@ export default function WeeklyBoard() {
 
           {/* ── Timeline separator ── */}
           <div
-            style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', position: 'sticky', top: topSectionHeight, zIndex: 20 }}
+            style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', position: 'sticky', top: topSectionHeight, zIndex: 5 }}
             className="flex items-center gap-2 px-3 py-1"
           >
             <div className="w-1 h-1 rounded-full" style={{ background: 'var(--accent-dim)' }} />
@@ -2136,7 +2136,7 @@ export default function WeeklyBoard() {
           </div>
 
           {/* ── Timeline date headers ── */}
-          <div style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', position: 'sticky', top: topSectionHeight + 24, zIndex: 19 }} />
+          <div style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', position: 'sticky', top: topSectionHeight + 24, zIndex: 4 }} />
           {visibleDays.map(day => {
             const dKey = format(day, 'yyyy-MM-dd')
             const td = isToday(day)
@@ -2149,7 +2149,7 @@ export default function WeeklyBoard() {
                   background: td ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-surface)',
                   borderLeft: '1px solid var(--border)',
                   borderBottom: '1px solid var(--border-dim)',
-                  position: 'sticky', top: topSectionHeight + 24, zIndex: 19,
+                  position: 'sticky', top: topSectionHeight + 24, zIndex: 4,
                 }}
               >
                 <span className="text-[10px] font-semibold" style={{ color: td ? 'var(--accent)' : dwi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}>
@@ -2288,7 +2288,7 @@ export default function WeeklyBoard() {
                 {/* Current time indicator */}
                 {today && nowY !== null && (
                   <div
-                    style={{ position: 'absolute', top: nowY, left: 0, right: 0, zIndex: 20 }}
+                    style={{ position: 'absolute', top: nowY, left: 0, right: 0, zIndex: 31 }}
                     className="pointer-events-none"
                   >
                     <div className="flex items-center">
