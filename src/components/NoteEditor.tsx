@@ -30,7 +30,7 @@ export default function NoteEditor({ noteId, content, onChange, autoFocus }: Not
       Markdown.configure({
         html: false,
         transformPastedText: true,
-        transformCopiedText: false,
+        transformCopiedText: true,
       }),
       // 체크박스 리스트: - [ ] / - [x]
       TaskList,

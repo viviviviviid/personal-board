@@ -174,9 +174,10 @@ body {
 .note-editor-content p {
   margin: 0;
   min-height: 1.7em;
+  line-height: 1.7;
 }
 .note-editor-content p + p {
-  margin-top: 2px;
+  margin-top: 8px;
 }
 
 .note-editor-content ul {
@@ -190,8 +191,9 @@ body {
   margin: 4px 0;
 }
 .note-editor-content li {
-  margin: 2px 0;
+  margin: 4px 0;
   display: list-item;
+  line-height: 1.7;
 }
 .note-editor-content ul > li::marker {
   color: var(--accent-light);

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { ChevronLeft, ChevronDown, ChevronRight, Plus, Check, X, Target, Trash2, Pencil, Calendar, AlertCircle, MoreHorizontal } from 'lucide-react'
 import AIPanel from '@/components/AIPanel'
 
@@ -202,6 +202,20 @@ function TodoItem({
           >
             <AlertCircle size={10} />{todo.urgent ? '긴급 해제' : '긴급'}
           </button>
+          {todo.date && (
+            <button
+              onClick={() => {
+                const nextDay = addDays(new Date(todo.date!), 1)
+                const nextDateStr = format(nextDay, 'yyyy-MM-dd')
+                onUpdate(todo.title, nextDateStr)
+                setActive(false)
+              }}
+              className="p-1 rounded text-[11px] flex items-center gap-1"
+              style={{ color: 'var(--text-dim)', background: 'var(--bg-input)', border: '1px solid var(--border)' }}
+            >
+              다음날↗
+            </button>
+          )}
           <button
             onClick={() => { onDelete(); setActive(false) }}
             className="p-1 rounded text-[11px] flex items-center gap-1"
@@ -318,14 +332,29 @@ function SectionHeader({
   isOpen,
   onToggle,
   onRename,
+  onDelete,
 }: {
   section: ProjectSection
   isOpen: boolean
   onToggle: () => void
   onRename: (title: string) => void
+  onDelete: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(section.title)
+  const [active, setActive] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!active) return
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setActive(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [active])
 
   const submit = () => {
     const t = editTitle.trim()
@@ -340,51 +369,73 @@ function SectionHeader({
 
   return (
     <div
-      className="flex items-center gap-2 px-4 py-3 w-full transition-colors group"
+      ref={containerRef}
+      className="flex flex-col px-4 py-3 w-full transition-colors"
       style={{ borderBottom: '1px solid var(--border-dim)' }}
     >
-      <button onClick={onToggle} className="flex-shrink-0">
-        {isOpen
-          ? <ChevronDown size={16} style={{ color: 'var(--text-dim)' }} />
-          : <ChevronRight size={16} style={{ color: 'var(--text-dim)' }} />
-        }
-      </button>
+      <div className="flex items-center gap-2 group">
+        <button onClick={onToggle} className="flex-shrink-0">
+          {isOpen
+            ? <ChevronDown size={16} style={{ color: 'var(--text-dim)' }} />
+            : <ChevronRight size={16} style={{ color: 'var(--text-dim)' }} />
+          }
+        </button>
 
-      {editing ? (
-        <input
-          type="text"
-          value={editTitle}
-          onChange={e => setEditTitle(e.target.value)}
-          {...imeProps}
-          className="flex-1 bg-transparent text-sm font-medium focus:outline-none"
-          style={{ borderBottom: '1px solid var(--accent-dim)', color: 'var(--text)' }}
-          autoFocus
-          onBlur={submit}
-        />
-      ) : (
-        <span
-          className="text-sm font-medium flex-1 cursor-text"
-          style={{ color: 'var(--text)' }}
-          onClick={() => setEditing(true)}
-          title="클릭하여 이름 수정"
-        >
-          {section.title}
-        </span>
-      )}
-
-      {!editing && (
-        <>
-          <button
-            onClick={() => setEditing(true)}
-            className="opacity-0 group-hover:opacity-100 transition-all"
-            style={{ color: 'var(--text-dim)' }}
+        {editing ? (
+          <input
+            type="text"
+            value={editTitle}
+            onChange={e => setEditTitle(e.target.value)}
+            {...imeProps}
+            className="flex-1 bg-transparent text-sm font-medium focus:outline-none"
+            style={{ borderBottom: '1px solid var(--accent-dim)', color: 'var(--text)' }}
+            autoFocus
+            onBlur={submit}
+          />
+        ) : (
+          <span
+            className="text-sm font-medium flex-1 cursor-pointer"
+            style={{ color: 'var(--text)' }}
+            onClick={() => setActive(a => !a)}
+            title="클릭하여 옵션 표시"
           >
-            <Pencil size={11} />
-          </button>
-          <span className="text-xs ml-auto" style={{ color: 'var(--text-dim)' }}>
-            {section.todos.filter(t => t.completed).length}/{section.todos.length}
+            {section.title}
           </span>
-        </>
+        )}
+
+        {!editing && (
+          <>
+            <button
+              onClick={() => setActive(a => !a)}
+              className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-all"
+              style={{ color: 'var(--text-dim)' }}
+            >
+              <MoreHorizontal size={14} />
+            </button>
+            <span className="text-xs ml-auto" style={{ color: 'var(--text-dim)' }}>
+              {section.todos.filter(t => t.completed).length}/{section.todos.length}
+            </span>
+          </>
+        )}
+      </div>
+
+      {active && !editing && (
+        <div className="flex items-center gap-1.5 pl-6 pt-1">
+          <button
+            onClick={() => { setEditing(true); setActive(false) }}
+            className="p-1 rounded text-[11px] flex items-center gap-1"
+            style={{ color: 'var(--text-dim)', background: 'var(--bg-input)', border: '1px solid var(--border)' }}
+          >
+            <Pencil size={10} />수정
+          </button>
+          <button
+            onClick={() => { onDelete(); setActive(false) }}
+            className="p-1 rounded text-[11px] flex items-center gap-1"
+            style={{ color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}
+          >
+            <Trash2 size={10} />삭제
+          </button>
+        </div>
       )}
     </div>
   )
@@ -551,6 +602,16 @@ export default function ProjectDetailPage() {
     }).catch(() => fetchProject())
   }
 
+  const deleteSection = async (sectionId: string) => {
+    setProject(p => p ? {
+      ...p,
+      sections: p.sections.filter(s => s.id !== sectionId),
+    } : p)
+    await fetch(`/api/projects/${projectId}/sections/${sectionId}`, {
+      method: 'DELETE',
+    }).catch(() => fetchProject())
+  }
+
   const addSection = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newSectionTitle.trim() || !project) return
@@ -702,6 +763,7 @@ export default function ProjectDetailPage() {
                 isOpen={isOpen}
                 onToggle={() => toggleSection(section.id)}
                 onRename={title => renameSection(section.id, title)}
+                onDelete={() => deleteSection(section.id)}
               />
               {isOpen && (
                 <div className="py-1">
