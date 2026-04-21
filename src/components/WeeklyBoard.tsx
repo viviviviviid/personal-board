@@ -565,6 +565,7 @@ export default function WeeklyBoard() {
 
   const [slideDir, setSlideDir] = useState<'next' | 'prev' | null>(null)
   const [monthSlideDir, setMonthSlideDir] = useState<'next' | 'prev' | null>(null)
+  const [topSectionHeight, setTopSectionHeight] = useState(0)
   const gridScrollRef = useRef<HTMLDivElement>(null)
 
   const [addingTodoDay, setAddingTodoDay] = useState<string | null>(null)
@@ -799,6 +800,9 @@ export default function WeeklyBoard() {
     const topSection = topSectionRef.current
     if (!outer || !topSection) return
 
+    const height = topSection.offsetHeight
+    setTopSectionHeight(height)
+
     const DEFAULT_HOUR = 9
     const defaultY = (DEFAULT_HOUR - FIRST_HOUR) * ROW_H  // 9시 = 208px
 
@@ -816,7 +820,7 @@ export default function WeeklyBoard() {
     const timelineY = 0
 
     // topSection 높이 + 타임라인 내 위치 = outer 스크롤 목표
-    const scrollTop = topSection.offsetHeight + timelineY
+    const scrollTop = height + timelineY
 
     const timer = setTimeout(() => {
       outer.scrollTo({ top: scrollTop, behavior: 'instant' as ScrollBehavior })
@@ -2122,7 +2126,7 @@ export default function WeeklyBoard() {
 
           {/* ── Timeline separator ── */}
           <div
-            style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', position: 'sticky', top: 0, zIndex: 20 }}
+            style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', position: 'sticky', top: topSectionHeight, zIndex: 20 }}
             className="flex items-center gap-2 px-3 py-1"
           >
             <div className="w-1 h-1 rounded-full" style={{ background: 'var(--accent-dim)' }} />
@@ -2132,7 +2136,7 @@ export default function WeeklyBoard() {
           </div>
 
           {/* ── Timeline date headers ── */}
-          <div style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', position: 'sticky', top: 24, zIndex: 19 }} />
+          <div style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', position: 'sticky', top: topSectionHeight + 24, zIndex: 19 }} />
           {visibleDays.map(day => {
             const dKey = format(day, 'yyyy-MM-dd')
             const td = isToday(day)
@@ -2145,7 +2149,7 @@ export default function WeeklyBoard() {
                   background: td ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-surface)',
                   borderLeft: '1px solid var(--border)',
                   borderBottom: '1px solid var(--border-dim)',
-                  position: 'sticky', top: 24, zIndex: 19,
+                  position: 'sticky', top: topSectionHeight + 24, zIndex: 19,
                 }}
               >
                 <span className="text-[10px] font-semibold" style={{ color: td ? 'var(--accent)' : dwi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}>
