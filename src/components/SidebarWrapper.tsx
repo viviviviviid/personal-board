@@ -26,8 +26,8 @@ export default function SidebarWrapper({ children }: { children: React.ReactNode
       className={`transition-all duration-200 ${isFullPage ? '' : 'min-h-screen p-3 md:p-4'}`}
       style={{
         marginLeft: isMobile ? 0 : isCollapsed ? 48 : 240,
-        paddingBottom: isFullPage ? 0 : 16,
-        height: '100vh',
+        paddingBottom: isFullPage ? 0 : isMobile ? 80 : 16,
+        height: '100dvh',
         overflowY: isFullPage ? 'hidden' : 'auto',
         display: 'flex',
         flexDirection: 'column',

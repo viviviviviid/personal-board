@@ -44,14 +44,24 @@
       "Bash(grep:*)",
       "Skill(commit-commands:commit)",
       "Bash(find /home/tyy8282/project/tool/personal-board/src -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) -exec basename {} \\\\;)",
-      "Bash(npx playwright *)",
-      "Bash(git check-ignore *)",
-      "Bash(echo \"exit: $?\")",
-      "Bash(npm test *)",
-      "Bash(service mysql *)",
-      "Bash(DATABASE_URL=\"mysql://root:12345678@127.0.0.1:3306/personal_board\" npx prisma db push)",
-      "Bash(DATABASE_URL=\"mysql://pb_user:pb_strong_password_2024@127.0.0.1:3306/personal_board\" npx prisma *)",
-      "Bash(DATABASE_URL=\"mysql://pb_user:pb_strong_password_2024@127.0.0.1:33060/personal_board\" npx prisma *)"
+      "Bash(ls:*)",
+      "Bash(identify /Users/viviviviviid/Desktop/project/tool/personal-board/flutter_app/android/app/src/main/res/mipmap-hdpi/ic_launcher.png)",
+      "Bash(convert --version)",
+      "Bash(magick --version)",
+      "Bash(git checkout:*)",
+      "Skill(commit-commands:commit-push-pr)",
+      "Bash(git push *)",
+      "Bash(awk 'NR>=534' /Users/viviviviviid/Desktop/project/tool/personal-board/src/components/WeeklyBoard.tsx)",
+      "Bash(awk 'NR>=2700' /Users/viviviviviid/Desktop/project/tool/personal-board/src/components/WeeklyBoard.tsx)",
+      "Bash(head -n 2640 /Users/viviviviviid/Desktop/project/tool/personal-board/src/components/WeeklyBoard.tsx)",
+      "Bash(mv /tmp/wb_trimmed.tsx /Users/viviviviviid/Desktop/project/tool/personal-board/src/components/WeeklyBoard.tsx)",
+      "Bash(dart run *)",
+      "Read(//Users/viviviviviid/Library/Android/sdk/platform-tools/**)",
+      "Bash(/Users/viviviviviid/Library/Android/sdk/platform-tools/adb version *)",
+      "Bash(flutter devices *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(pkill -f \"tooling-daemon\")",
+      "Bash(pkill -f \"flutter_tools.snapshot\")"
     ]
   }
 }
