@@ -1,5 +1,5 @@
-export const FIRST_HOUR = 5
-export const LAST_HOUR = 23
+export const FIRST_HOUR = 0
+export const LAST_HOUR = 24
 export const ROW_H = 52          // px per hour
 export const SNAP = 15           // snap to 15-min
 export const TOTAL_H = (LAST_HOUR - FIRST_HOUR + 1) * ROW_H

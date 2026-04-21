@@ -90,17 +90,25 @@ describe('addOneHour', () => {
 
 describe('nowToY', () => {
   test('returns null for hours before FIRST_HOUR', () => {
-    const before = new Date()
-    before.setHours(FIRST_HOUR - 1, 0, 0, 0)
-    expect(nowToY(before)).toBeNull()
+    // Skip if FIRST_HOUR is 0 (no hour before midnight)
+    if (FIRST_HOUR > 0) {
+      const before = new Date()
+      before.setHours(FIRST_HOUR - 1, 0, 0, 0)
+      expect(nowToY(before)).toBeNull()
+    } else {
+      // At FIRST_HOUR=0, all times are within range
+      expect(FIRST_HOUR).toBe(0)
+    }
   })
 
-  test('returns null for hours after LAST_HOUR', () => {
-    // LAST_HOUR + 1 would be next day if LAST_HOUR is 23, skip if not possible
-    if (LAST_HOUR < 23) {
-      const after = new Date()
-      after.setHours(LAST_HOUR + 1, 0, 0, 0)
-      expect(nowToY(after)).toBeNull()
+  test('handles hours at and around LAST_HOUR', () => {
+    // With LAST_HOUR=24, getHours() maxes at 23 so direct test isn't possible
+    // Instead verify that valid hours within range return numbers
+    const validHours = [FIRST_HOUR, 12, 23]
+    for (const h of validHours) {
+      const t = new Date()
+      t.setHours(h, 0, 0, 0)
+      expect(typeof nowToY(t)).toBe('number')
     }
   })
 
@@ -114,5 +122,60 @@ describe('nowToY', () => {
     const t = new Date()
     t.setHours(FIRST_HOUR, 0, 0, 0)
     expect(nowToY(t)).toBe(0)
+  })
+})
+
+describe('Midnight support (0:00 - 24:00)', () => {
+  test('FIRST_HOUR=0 supports midnight', () => {
+    expect(FIRST_HOUR).toBe(0)
+  })
+
+  test('LAST_HOUR=24 supports full 24-hour range', () => {
+    expect(LAST_HOUR).toBe(24)
+  })
+
+  test('timeToY maps 00:00 to y=0', () => {
+    expect(timeToY('00:00')).toBe(0)
+  })
+
+  test('timeToY maps 12:00 (noon) to middle of day', () => {
+    const noonY = timeToY('12:00')
+    const expectedY = (12 - FIRST_HOUR) * ROW_H
+    expect(noonY).toBe(expectedY)
+  })
+
+  test('timeToY maps 23:00 to near end', () => {
+    const y = timeToY('23:00')
+    expect(y).toBeGreaterThan(0)
+    expect(y).toBeLessThan(TOTAL_H)
+  })
+
+  test('yToTime for early morning hours', () => {
+    expect(yToTime(0)).toBe('00:00')
+    expect(yToTime(ROW_H)).toBe('01:00')
+    expect(yToTime(ROW_H * 4)).toBe('04:00')
+  })
+
+  test('yToTime for afternoon hours', () => {
+    const y12 = (12 - FIRST_HOUR) * ROW_H
+    const y18 = (18 - FIRST_HOUR) * ROW_H
+    expect(yToTime(y12)).toBe('12:00')
+    expect(yToTime(y18)).toBe('18:00')
+  })
+
+  test('addOneHour works from morning to afternoon', () => {
+    expect(addOneHour('00:00')).toBe('01:00')
+    expect(addOneHour('06:30')).toBe('07:30')
+    expect(addOneHour('11:45')).toBe('12:45')
+  })
+
+  test('addOneHour clamps at LAST_HOUR=24', () => {
+    const result = addOneHour('23:30')
+    const hour = parseInt(result.split(':')[0])
+    expect(hour).toBeLessThanOrEqual(LAST_HOUR)
+  })
+
+  test('TOTAL_H represents 24 hours of ROW_H pixels', () => {
+    expect(TOTAL_H).toBe(25 * ROW_H) // (24 - 0 + 1) * 52
   })
 })

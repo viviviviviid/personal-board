@@ -812,16 +812,8 @@ export default function WeeklyBoard() {
       .filter(e => isSameDay(new Date(e.date), targetDay))
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
 
-    let timelineY: number
-    if (todayInWeek && currentNowY !== null) {
-      timelineY = Math.max(0, currentNowY - 100)
-    } else if (dayEntries.length > 0) {
-      const [h, m] = dayEntries[0].startTime.split(':').map(Number)
-      const entryY = (h - FIRST_HOUR) * ROW_H + (m / 60) * ROW_H
-      timelineY = Math.max(0, entryY - 80)
-    } else {
-      timelineY = defaultY
-    }
+    // 항상 맨 위(투두)부터 보이도록 시작
+    const timelineY = 0
 
     // topSection 높이 + 타임라인 내 위치 = outer 스크롤 목표
     const scrollTop = topSection.offsetHeight + timelineY
@@ -1243,6 +1235,29 @@ export default function WeeklyBoard() {
   const colCount = visibleDays.length
   const gridCols = `32px repeat(${colCount}, minmax(0, 1fr))`
   const gridMinWidth = isMobile ? 0 : Math.max(320, colCount * 130 + 32)
+
+  // 동적 타임라인 높이 계산 (24시 이후 콘텐츠 있을 때만 확장)
+  const calculateTimelineHeight = useCallback(() => {
+    let maxHour = LAST_HOUR
+    for (const day of visibleDays) {
+      const entries = entriesForDay(day)
+      const dayGoogleEvents = googleEventsForDay(day)
+
+      for (const entry of entries) {
+        const endTime = entry.endTime || addOneHour(entry.startTime)
+        const h = parseInt(endTime.split(':')[0])
+        maxHour = Math.max(maxHour, h)
+      }
+
+      for (const event of dayGoogleEvents) {
+        const h = new Date(event.end.dateTime!).getHours()
+        maxHour = Math.max(maxHour, h)
+      }
+    }
+    return (maxHour - FIRST_HOUR + 1) * ROW_H
+  }, [visibleDays, timeline, googleEvents])
+
+  const timelineHeight = calculateTimelineHeight()
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -1954,7 +1969,7 @@ export default function WeeklyBoard() {
                               >
                                 <AlertCircle size={9} />{todo.urgent ? '긴급해제' : '긴급'}
                               </button>
-                              {isMobile && todo.date && (
+                              {todo.date && (
                                 <button
                                   onClick={e => {
                                     e.stopPropagation()
@@ -2096,7 +2111,7 @@ export default function WeeklyBoard() {
         {/* ── 하단 독립 스크롤: 타임라인 ── */}
         <div
           ref={gridScrollRef}
-          style={{ flexShrink: 0, overflowX: 'clip', overscrollBehavior: 'contain' }}
+          style={{ flexShrink: 0, overflowX: 'clip', overscrollBehavior: 'contain', height: timelineHeight }}
         >
         <div style={{
           display: 'grid',
@@ -2177,7 +2192,7 @@ export default function WeeklyBoard() {
           )}
 
           {/* ── Time labels ── */}
-          <div style={{ position: 'relative', height: TOTAL_H, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}>
+          <div style={{ position: 'relative', height: timelineHeight, background: 'var(--bg-surface)', borderRight: '1px solid var(--border)' }}>
             {HOURS.map(hour => (
               <div
                 key={hour}
@@ -2209,7 +2224,7 @@ export default function WeeklyBoard() {
                 key={dateKey}
                 ref={el => { columnRefs.current[colIdx] = el }}
                 style={{
-                  position: 'relative', height: TOTAL_H,
+                  position: 'relative', height: timelineHeight,
                   background: today ? 'rgba(139, 92, 246, 0.04)' : 'var(--bg-surface)',
                   borderLeft: '1px solid var(--border)',
                 }}
@@ -2223,7 +2238,7 @@ export default function WeeklyBoard() {
                   const onMove = (ev: MouseEvent) => {
                     const drag = creationDragRef.current
                     if (!drag || drag.dateKey !== dateKey) return
-                    const currentY = Math.max(0, Math.min(TOTAL_H, ev.clientY - drag.columnTop))
+                    const currentY = Math.max(0, Math.min(timelineHeight, ev.clientY - drag.columnTop))
                     if (Math.abs(ev.clientY - drag.startMouseY) > 5) {
                       setCreationDrag({
                         dateKey: drag.dateKey,
@@ -2241,7 +2256,7 @@ export default function WeeklyBoard() {
                     creationDragRef.current = null
                     setCreationDrag(null)
                     if (!drag || didDragRef.current) return
-                    const currentY = Math.max(0, Math.min(TOTAL_H, ev.clientY - drag.columnTop))
+                    const currentY = Math.max(0, Math.min(timelineHeight, ev.clientY - drag.columnTop))
                     const delta = Math.abs(ev.clientY - drag.startMouseY)
                     if (delta < 8) {
                       // 클릭 — 기존 동작
