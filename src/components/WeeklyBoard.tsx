@@ -2111,12 +2111,13 @@ export default function WeeklyBoard() {
         {/* ── 하단 독립 스크롤: 타임라인 ── */}
         <div
           ref={gridScrollRef}
-          style={{ flexShrink: 0, overflowX: 'clip', overscrollBehavior: 'contain', height: timelineHeight }}
+          style={{ flex: 1, overflowX: 'clip', overscrollBehavior: 'contain' }}
         >
         <div style={{
           display: 'grid',
           gridTemplateColumns: gridCols,
           minWidth: gridMinWidth,
+          minHeight: timelineHeight,
         }}>
 
           {/* ── Timeline separator ── */}
