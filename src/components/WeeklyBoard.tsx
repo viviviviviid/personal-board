@@ -1778,7 +1778,7 @@ export default function WeeklyBoard() {
         onAnimationEnd={() => setSlideDir(null)}
       >
         {/* ── 상단 고정: 헤더 + 하이라이트 + TO-DO ── */}
-        <div ref={topSectionRef} style={{ flexShrink: 0, position: 'sticky', top: 0 }}>
+        <div ref={topSectionRef} style={{ flexShrink: 0, position: 'sticky', top: 0, background: 'var(--bg-surface)', zIndex: 15 }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: gridCols,
