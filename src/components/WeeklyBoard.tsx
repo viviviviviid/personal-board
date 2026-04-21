@@ -215,7 +215,7 @@ function EntryBlock({ entry, onDelete, onDragStart, onSelect, layoutCol = 0, lay
   return (
     <div
       style={{
-        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 30,
+        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 15,
         background: s.bg, border: `1px solid ${s.border}`, color: s.text,
         borderRadius: 6,
       }}
@@ -510,7 +510,7 @@ function GoogleEventBlock({ event, layoutCol = 0, layoutTotal = 1, effectiveStar
   return (
     <div
       style={{
-        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 29,
+        position: 'absolute', top, left: colLeft, width: colWidth, height, zIndex: 10,
         background: `${color}33`,
         border: `1px solid ${color}88`,
         color,
@@ -1778,7 +1778,7 @@ export default function WeeklyBoard() {
         onAnimationEnd={() => setSlideDir(null)}
       >
         {/* ── 상단 고정: 헤더 + 하이라이트 + TO-DO ── */}
-        <div ref={topSectionRef} style={{ flexShrink: 0, position: 'sticky', top: 0, background: 'var(--bg-surface)', zIndex: 15 }}>
+        <div ref={topSectionRef} style={{ flexShrink: 0, position: 'sticky', top: 0, background: 'var(--bg-surface)', zIndex: 50 }}>
         <div style={{
           display: 'grid',
           gridTemplateColumns: gridCols,
@@ -2126,7 +2126,7 @@ export default function WeeklyBoard() {
 
           {/* ── Timeline separator ── */}
           <div
-            style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', position: 'sticky', top: topSectionHeight, zIndex: 5 }}
+            style={{ gridColumn: '1 / -1', borderBottom: '1px solid var(--border-dim)', background: 'var(--bg-surface)', position: 'sticky', top: topSectionHeight, zIndex: 1 }}
             className="flex items-center gap-2 px-3 py-1"
           >
             <div className="w-1 h-1 rounded-full" style={{ background: 'var(--accent-dim)' }} />
@@ -2149,7 +2149,7 @@ export default function WeeklyBoard() {
                   background: td ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-surface)',
                   borderLeft: '1px solid var(--border)',
                   borderBottom: '1px solid var(--border-dim)',
-                  position: 'sticky', top: topSectionHeight + 24, zIndex: 4,
+                  position: 'sticky', top: topSectionHeight + 24, zIndex: 2,
                 }}
               >
                 <span className="text-[10px] font-semibold" style={{ color: td ? 'var(--accent)' : dwi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}>
@@ -2288,7 +2288,7 @@ export default function WeeklyBoard() {
                 {/* Current time indicator */}
                 {today && nowY !== null && (
                   <div
-                    style={{ position: 'absolute', top: nowY, left: 0, right: 0, zIndex: 31 }}
+                    style={{ position: 'absolute', top: nowY, left: 0, right: 0, zIndex: 20 }}
                     className="pointer-events-none"
                   >
                     <div className="flex items-center">
@@ -2332,7 +2332,7 @@ export default function WeeklyBoard() {
                       position: 'absolute',
                       top: creationDrag.topY,
                       height: Math.max(ROW_H / 4, creationDrag.bottomY - creationDrag.topY),
-                      left: 3, right: 3, zIndex: 25,
+                      left: 3, right: 3, zIndex: 12,
                       background: 'var(--accent-dim)',
                       border: '1px solid var(--accent)',
                       borderRadius: 6,
