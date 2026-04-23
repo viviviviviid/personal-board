@@ -15,9 +15,20 @@ export default function NativeAppBridge() {
 
   useEffect(() => {
     if (!isNativeApp) return
-    const handler = () => setSettingsOpen(true)
-    window.addEventListener('personalboard:openSettings', handler)
-    return () => window.removeEventListener('personalboard:openSettings', handler)
+
+    const handleOpenSettings = () => setSettingsOpen(true)
+    const handleBackPressed = () => {
+      // 백버튼 처리 — Context에서 우선순위대로 처리됨
+      window.dispatchEvent(new Event('personalboard:backPressed'))
+    }
+
+    window.addEventListener('personalboard:openSettings', handleOpenSettings)
+    window.addEventListener('personalboard:backPressed', handleBackPressed)
+
+    return () => {
+      window.removeEventListener('personalboard:openSettings', handleOpenSettings)
+      window.removeEventListener('personalboard:backPressed', handleBackPressed)
+    }
   }, [isNativeApp])
 
   useEffect(() => {

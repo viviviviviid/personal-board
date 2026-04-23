@@ -116,7 +116,7 @@ export default function Sidebar() {
       <div className="px-3 py-4 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border-dim)' }}>
         {/* 설정 버튼 */}
         <button
-          onClick={() => setSettingsOpen(true)}
+          onClick={() => setSettingsOpen(prev => !prev)}
           className="flex items-center rounded-xl p-2 w-full transition-all"
           style={{
             gap: isCollapsed ? 0 : 8,

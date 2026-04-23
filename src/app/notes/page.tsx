@@ -68,6 +68,7 @@ export default function NotesPage() {
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const draftRef = useRef(draft)
   const selectedRef = useRef(selected)
+  const { handlers: tagInputHandlers, onKeyDown: tagInputOnKeyDown } = useKeyboardInput()
 
   // ── 비밀 메모 (vault) 상태 ──
   const { cryptoKey, setCryptoKey } = useVaultKey()
@@ -950,27 +951,22 @@ export default function NotesPage() {
                   </span>
                 ))}
                 {showTagInput ? (
-                  {(() => {
-                    const { handlers, onKeyDown } = useKeyboardInput()
-                    return (
-                      <input
-                        autoFocus
-                        value={tagInput}
-                        onChange={e => setTagInput(e.target.value)}
-                        onKeyDown={e => onKeyDown(e, {
-                          submit: addTag,
-                          cancel: () => { setShowTagInput(false); setTagInput('') }
-                        })}
-                        {...handlers}
-                        onBlur={() => { addTag(); setShowTagInput(false) }}
-                        placeholder="태그 입력"
-                        style={{
-                          width: 80, padding: '2px 6px', borderRadius: 7, border: '1px solid var(--accent)',
-                          background: 'var(--bg-input)', color: 'var(--text)', fontSize: 11, outline: 'none',
-                        }}
-                      />
-                    )
-                  })()
+                  <input
+                    autoFocus
+                    value={tagInput}
+                    onChange={e => setTagInput(e.target.value)}
+                    onKeyDown={e => tagInputOnKeyDown(e, {
+                      submit: addTag,
+                      cancel: () => { setShowTagInput(false); setTagInput('') }
+                    })}
+                    {...tagInputHandlers}
+                    onBlur={() => { addTag(); setShowTagInput(false) }}
+                    placeholder="태그 입력"
+                    style={{
+                      width: 80, padding: '2px 6px', borderRadius: 7, border: '1px solid var(--accent)',
+                      background: 'var(--bg-input)', color: 'var(--text)', fontSize: 11, outline: 'none',
+                    }}
+                  />
                 ) : (
                   <button
                     onClick={() => setShowTagInput(true)}

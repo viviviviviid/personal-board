@@ -61,7 +61,9 @@
       "Bash(flutter devices *)",
       "Bash(echo \"EXIT:$?\")",
       "Bash(pkill -f \"tooling-daemon\")",
-      "Bash(pkill -f \"flutter_tools.snapshot\")"
+      "Bash(pkill -f \"flutter_tools.snapshot\")",
+      "Bash(sed -n '1545,1550p' \"src/app/projects/[id]/page.tsx\")",
+      "Bash(sed -n '1545,1550p' \"src/components/WeeklyBoard.tsx\")"
     ]
   }
 }

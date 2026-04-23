@@ -58,7 +58,7 @@ const HEADER_H = 58
 interface Props {
   currentMonth: Date
   monthCount: 1 | 2 | 3
-  enabledCalendars?: Set<string>
+  enabledCalendars?: string[]
   calendarList?: CalendarItem[]
   onDateSelect?: (date: Date) => void
 }
@@ -122,11 +122,11 @@ export default function MonthlyCalendar({ currentMonth, monthCount, enabledCalen
   }, [currentMonth, monthCount])
 
   const fetchCalEvents = useCallback(async () => {
-    if (!enabledCalendars || enabledCalendars.size === 0) {
+    if (!enabledCalendars || enabledCalendars.length === 0) {
       setCalEvents([])
       return
     }
-    const ids = [...enabledCalendars]
+    const ids = enabledCalendars
     const colors = ids.map(id => calendarList?.find(c => c.id === id)?.backgroundColor ?? '#4285F4')
     const timeMin = startOfMonth(currentMonth).toISOString()
     const timeMax = endOfMonth(addMonths(currentMonth, monthCount - 1)).toISOString()

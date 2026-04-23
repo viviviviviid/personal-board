@@ -10,6 +10,8 @@ import { AutoFeedbackProvider } from '@/context/AutoFeedbackContext'
 import SessionProviderWrapper from '@/components/SessionProviderWrapper'
 import PWARegister from '@/components/PWARegister'
 import AutoFeedbackTrigger from '@/components/AutoFeedbackTrigger'
+import { BackNavigationProvider } from '@/context/BackNavigationContext'
+import { ModalStackProvider } from '@/context/ModalStackContext'
 
 const caveat = Caveat({
   subsets: ['latin'],
@@ -47,9 +49,11 @@ export default function RootLayout({
       </head>
       <body className="min-h-full antialiased">
         <SessionProviderWrapper>
-          <AutoFeedbackProvider>
-          <VaultProvider>
-          <SidebarProvider>
+          <BackNavigationProvider>
+            <ModalStackProvider>
+              <AutoFeedbackProvider>
+            <VaultProvider>
+            <SidebarProvider>
             {/* 데스크탑 사이드바 */}
             <Sidebar />
             <SidebarWrapper>
@@ -58,9 +62,11 @@ export default function RootLayout({
             </SidebarWrapper>
             <NativeAppBridge />
             <AutoFeedbackTrigger />
-          </SidebarProvider>
-          </VaultProvider>
-          </AutoFeedbackProvider>
+            </SidebarProvider>
+            </VaultProvider>
+            </AutoFeedbackProvider>
+            </ModalStackProvider>
+          </BackNavigationProvider>
         </SessionProviderWrapper>
       </body>
     </html>

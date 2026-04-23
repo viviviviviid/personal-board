@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSwipe } from '@/hooks/useSwipe'
+import { useKeyboardInput } from '@/hooks/useKeyboardInput'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { format, addWeeks, subWeeks, startOfWeek, addDays, isSameDay, isToday, addMonths, subMonths, startOfMonth } from 'date-fns'
 import { useSidebar } from '@/context/SidebarContext'
 import { ChevronLeft, ChevronRight, Plus, Check, X, CalendarDays, RefreshCw, Unlink, AlertCircle } from 'lucide-react'
@@ -13,6 +15,7 @@ import {
   FIRST_HOUR, LAST_HOUR, ROW_H, SNAP, TOTAL_H,
   timeToY, yToTime, addOneHour, nowToY,
 } from '@/lib/timeUtils'
+import { STORAGE_KEYS } from '@/lib/storageKeys'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface GoogleCalendar {
@@ -539,8 +542,8 @@ export default function WeeklyBoard() {
     startOfWeek(new Date(), { weekStartsOn: 1 })
   )
   const [currentMonth, setCurrentMonth] = useState(() => startOfMonth(new Date()))
-  const [monthCount, setMonthCount] = useState<1 | 2 | 3>(1)
-  const [mobileDayCols, setMobileDayCols] = useState(2)
+  const [monthCount, setMonthCount] = useLocalStorage<1 | 2 | 3>(STORAGE_KEYS.BOARD_MONTH_COUNT, 1)
+  const [mobileDayCols, setMobileDayCols] = useLocalStorage<number>(STORAGE_KEYS.BOARD_MOBILE_COLS, 2)
   const [desktopDayCols, setDesktopDayCols] = useState(7)
   const [desktopViewStart, setDesktopViewStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
   const { isCollapsed } = useSidebar()
@@ -548,8 +551,8 @@ export default function WeeklyBoard() {
   const [timeline, setTimeline] = useState<TimelineEntry[]>([])
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([])
   const [calendarList, setCalendarList] = useState<GoogleCalendar[]>([])
-  const [weeklyEnabledCals, setWeeklyEnabledCals] = useState<Set<string>>(new Set())
-  const [monthlyEnabledCals, setMonthlyEnabledCals] = useState<Set<string>>(new Set())
+  const [weeklyEnabledCals, setWeeklyEnabledCals] = useLocalStorage<string[]>(STORAGE_KEYS.ENABLED_CALENDARS_WEEKLY, [])
+  const [monthlyEnabledCals, setMonthlyEnabledCals] = useLocalStorage<string[]>(STORAGE_KEYS.ENABLED_CALENDARS_MONTHLY, [])
   const [highlights, setHighlights] = useState<DailyHighlight[]>([])
   const [calPanelOpen, setCalPanelOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -590,11 +593,7 @@ export default function WeeklyBoard() {
   const [entryWeekDays, setEntryWeekDays] = useState<number[]>([])
   const [entryCreateTodo, setEntryCreateTodo] = useState(false)
   const [entryHideMonthly, setEntryHideMonthly] = useState(false)
-  const [onboardingDone, setOnboardingDone] = useState(true) // default true — localStorage로 덮어씀
-
-  useEffect(() => {
-    if (!localStorage.getItem('pb-onboarding-done')) setOnboardingDone(false)
-  }, [])
+  const [onboardingDone, setOnboardingDone] = useLocalStorage(STORAGE_KEYS.ONBOARDING_DONE, false)
 
   // Click outside → deactivate active todo options
   useEffect(() => {
@@ -608,19 +607,13 @@ export default function WeeklyBoard() {
   }, [activeTodoId])
 
   const dismissOnboarding = () => {
-    localStorage.setItem('pb-onboarding-done', '1')
     setOnboardingDone(true)
   }
 
   // 캘린더 연결 유도 배너 (최초 1회)
-  const [calPromptDismissed, setCalPromptDismissed] = useState(true)
-
-  useEffect(() => {
-    if (!localStorage.getItem('pb-cal-prompted')) setCalPromptDismissed(false)
-  }, [])
+  const [calPromptDismissed, setCalPromptDismissed] = useLocalStorage(STORAGE_KEYS.CAL_PROMPTED, false)
 
   const dismissCalPrompt = () => {
-    localStorage.setItem('pb-cal-prompted', '1')
     setCalPromptDismissed(true)
   }
 
@@ -655,11 +648,9 @@ export default function WeeklyBoard() {
       setCalendarList(cals)
       setCalStatus('ok')
       const allIds = cals.map(c => c.id)
-      // localStorage에서 복원, 없으면 전체 활성화
-      const savedWeekly = localStorage.getItem('enabled-calendars-weekly')
-      setWeeklyEnabledCals(savedWeekly ? new Set(JSON.parse(savedWeekly)) : new Set(allIds))
-      const savedMonthly = localStorage.getItem('enabled-calendars-monthly')
-      setMonthlyEnabledCals(savedMonthly ? new Set(JSON.parse(savedMonthly)) : new Set(allIds))
+      // 캘린더 초기 설정 (이미 localStorage에 저장되어 있으면 그것 사용)
+      if (weeklyEnabledCals.length === 0) setWeeklyEnabledCals(allIds)
+      if (monthlyEnabledCals.length === 0) setMonthlyEnabledCals(allIds)
     } catch {
       setCalStatus('error')
     }
@@ -682,8 +673,7 @@ export default function WeeklyBoard() {
     setWeeklyEnabledCals(prev => {
       const next = new Set(prev)
       if (next.has(calId)) next.delete(calId); else next.add(calId)
-      localStorage.setItem('enabled-calendars-weekly', JSON.stringify([...next]))
-      return next
+      return [...next]
     })
   }
 
@@ -691,34 +681,10 @@ export default function WeeklyBoard() {
     setMonthlyEnabledCals(prev => {
       const next = new Set(prev)
       if (next.has(calId)) next.delete(calId); else next.add(calId)
-      localStorage.setItem('enabled-calendars-monthly', JSON.stringify([...next]))
-      return next
+      return [...next]
     })
   }
 
-  // Persist monthCount
-  useEffect(() => {
-    const saved = localStorage.getItem('board-month-count')
-    if (saved === '1' || saved === '2' || saved === '3') {
-      setMonthCount(Number(saved) as 1 | 2 | 3)
-    }
-  }, [])
-
-  const setMonthCountPersist = (n: 1 | 2 | 3) => {
-    setMonthCount(n)
-    localStorage.setItem('board-month-count', String(n))
-  }
-
-  // Persist mobileDayCols
-  useEffect(() => {
-    const saved = localStorage.getItem('board-mobile-cols')
-    if (saved && Number(saved) >= 1) setMobileDayCols(Number(saved))
-  }, [])
-
-  const setMobileDayColsPersist = (n: number) => {
-    setMobileDayCols(n)
-    localStorage.setItem('board-mobile-cols', String(n))
-  }
 
   // Auto-detect desktopDayCols from content width (window - sidebar)
   useEffect(() => {
@@ -886,9 +852,9 @@ export default function WeeklyBoard() {
         .then(setHighlights)
         .catch(() => {})
 
-      const gcPromise = weeklyEnabledCals.size > 0
+      const gcPromise = weeklyEnabledCals.length > 0
         ? (() => {
-            const ids = [...weeklyEnabledCals]
+            const ids = weeklyEnabledCals
             const colors = ids.map(id => calendarList.find(c => c.id === id)?.backgroundColor ?? '#4285F4')
             return fetch(
               `/api/google-calendar?timeMin=${timeMin}&timeMax=${timeMax}&calendarIds=${ids.map(encodeURIComponent).join(',')}&calendarColors=${colors.map(encodeURIComponent).join(',')}`
@@ -1171,6 +1137,21 @@ export default function WeeklyBoard() {
           ? { ...t, endTime: yToTime(drag.startY + newDurPx) } : t
         ))
       }
+
+      // Auto-scroll on mobile
+      if (isMobile && outerScrollRef.current) {
+        const container = outerScrollRef.current
+        const scrollThreshold = 60
+        const scrollSpeed = 8
+        const distFromTop = ev.clientY - container.getBoundingClientRect().top
+        const distFromBottom = container.getBoundingClientRect().bottom - ev.clientY
+
+        if (distFromTop < scrollThreshold && container.scrollTop > 0) {
+          container.scrollTop -= scrollSpeed
+        } else if (distFromBottom < scrollThreshold) {
+          container.scrollTop += scrollSpeed
+        }
+      }
     }
 
     const onUp = () => {
@@ -1405,13 +1386,13 @@ export default function WeeklyBoard() {
                             {cal.primary && <span className="ml-1 text-[9px]" style={{ color: 'var(--text-dim)' }}>기본</span>}
                           </span>
                           <button onClick={() => toggleCalendarWeekly(cal.id)} className="w-7 flex items-center justify-center" title="주간에 표시">
-                            <div style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, background: weeklyEnabledCals.has(cal.id) ? cal.backgroundColor : 'transparent', border: `2px solid ${weeklyEnabledCals.has(cal.id) ? cal.backgroundColor : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {weeklyEnabledCals.has(cal.id) && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            <div style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, background: weeklyEnabledCals.includes(cal.id) ? cal.backgroundColor : 'transparent', border: `2px solid ${weeklyEnabledCals.includes(cal.id) ? cal.backgroundColor : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {weeklyEnabledCals.includes(cal.id) && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                             </div>
                           </button>
                           <button onClick={() => toggleCalendarMonthly(cal.id)} className="w-7 flex items-center justify-center" title="월간에 표시">
-                            <div style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, background: monthlyEnabledCals.has(cal.id) ? cal.backgroundColor : 'transparent', border: `2px solid ${monthlyEnabledCals.has(cal.id) ? cal.backgroundColor : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {monthlyEnabledCals.has(cal.id) && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                            <div style={{ width: 14, height: 14, borderRadius: 3, flexShrink: 0, background: monthlyEnabledCals.includes(cal.id) ? cal.backgroundColor : 'transparent', border: `2px solid ${monthlyEnabledCals.includes(cal.id) ? cal.backgroundColor : 'var(--border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {monthlyEnabledCals.includes(cal.id) && <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5L6.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                             </div>
                           </button>
                         </div>
@@ -1475,7 +1456,7 @@ export default function WeeklyBoard() {
                 {[1, 2, 3].map((n, i, arr) => (
                   <button
                     key={n}
-                    onClick={() => setMobileDayColsPersist(n)}
+                    onClick={() => setMobileDayCols(n)}
                     className="px-2 py-1 text-xs transition-all"
                     style={{
                       background: mobileDayCols === n ? 'var(--accent-dim)' : 'var(--bg-card)',
@@ -1515,7 +1496,7 @@ export default function WeeklyBoard() {
                 {([1, 2, 3] as const).map((n, i) => (
                   <button
                     key={n}
-                    onClick={() => setMonthCountPersist(n)}
+                    onClick={() => setMonthCount(n)}
                     className="px-2 py-1 text-xs transition-all"
                     style={{
                       background: monthCount === n ? 'var(--accent-dim)' : 'var(--bg-card)',
