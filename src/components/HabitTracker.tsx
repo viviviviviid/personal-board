@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { Plus, Check, Flame, X, Trash2 } from 'lucide-react'
+import { useKeyboardInput } from '@/hooks/useKeyboardInput'
 
 interface HabitLog {
   id: string
@@ -29,6 +30,7 @@ export default function HabitTracker() {
   const [adding, setAdding] = useState(false)
   const [createTodo, setCreateTodo] = useState(false)
 
+  const { handlers, onKeyDown } = useKeyboardInput()
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const fetchHabits = async () => {
@@ -154,9 +156,14 @@ export default function HabitTracker() {
               type="text"
               value={newHabitName}
               onChange={(e) => setNewHabitName(e.target.value)}
+              onKeyDown={(e) => onKeyDown(e, {
+                submit: () => { const event = new Event('submit', { bubbles: true, cancelable: true }); e.currentTarget.form?.dispatchEvent(event) },
+                cancel: () => setShowAddForm(false)
+              })}
               placeholder="새 습관 이름..."
               className="flex-1 bg-[var(--bg-input)] border border-[var(--border-dim)] rounded-lg px-3 py-1.5 text-sm text-[var(--text)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
               autoFocus
+              {...handlers}
             />
             <button
               type="submit"

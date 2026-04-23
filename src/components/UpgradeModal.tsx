@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useScrollLock } from '@/hooks/useScrollLock'
 
 interface Props {
   open: boolean
@@ -13,6 +14,8 @@ const YEARLY_PRICE_ID = process.env.NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID!
 export default function UpgradeModal({ open, onClose, reason }: Props) {
   const [loading, setLoading] = useState(false)
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly')
+
+  useScrollLock(open)
 
   if (!open) return null
 

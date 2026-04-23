@@ -6,6 +6,9 @@ import Image from 'next/image'
 import { X, LogOut, Calendar, Sun, Moon } from 'lucide-react'
 import UpgradeModal from '@/components/UpgradeModal'
 import { useUpgradeModal } from '@/hooks/useUpgradeModal'
+import { useScrollLock } from '@/hooks/useScrollLock'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { STORAGE_KEYS } from '@/lib/storageKeys'
 
 const CALENDAR_SCOPE = 'openid email profile https://www.googleapis.com/auth/calendar.readonly'
 
@@ -102,25 +105,17 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { data: session } = useSession()
   const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const [calStatus, setCalStatus] = useState<CalStatus>('loading')
-  const [defaultView, setDefaultView] = useState<'weekly' | 'monthly'>('weekly')
-  const [weekStart, setWeekStart] = useState<'mon' | 'sun'>('mon')
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [autoFeedback, setAutoFeedback] = useState(false)
-  const [feedbackDataTypes, setFeedbackDataTypes] = useState<string[]>(['todos', 'timeline', 'habits', 'highlights'])
+  const [defaultView, setDefaultView] = useLocalStorage<'weekly' | 'monthly'>(STORAGE_KEYS.BOARD_DEFAULT_VIEW, 'weekly')
+  const [weekStart, setWeekStart] = useLocalStorage<'mon' | 'sun'>(STORAGE_KEYS.BOARD_WEEK_START, 'mon')
+  const [theme, setTheme] = useLocalStorage<'dark' | 'light'>(STORAGE_KEYS.BOARD_THEME, 'dark')
+  const [autoFeedback, setAutoFeedback] = useLocalStorage(STORAGE_KEYS.AI_AUTO_FEEDBACK, false)
+  const [feedbackDataTypes, setFeedbackDataTypes] = useLocalStorage<string[]>(STORAGE_KEYS.AI_FEEDBACK_DATA_TYPES, ['todos', 'timeline', 'habits', 'highlights'])
   const { upgradeOpen, upgradeReason, triggerUpgrade, closeUpgrade } = useUpgradeModal()
+
+  useScrollLock(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
-    // localStorage 읽기
-    const view = localStorage.getItem('default-view')
-    if (view === 'weekly' || view === 'monthly') setDefaultView(view)
-    const ws = localStorage.getItem('week-start')
-    if (ws === 'mon' || ws === 'sun') setWeekStart(ws)
-    const t = localStorage.getItem('theme')
-    setTheme(t === 'light' ? 'light' : 'dark')
-    setAutoFeedback(localStorage.getItem('ai-auto-feedback') === 'true')
-    const stored = localStorage.getItem('ai-feedback-data-types')
-    if (stored) setFeedbackDataTypes(JSON.parse(stored))
     // 캘린더 상태 확인
     setCalStatus('loading')
     fetch('/api/google-calendar/list')
@@ -129,44 +124,30 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       .catch(() => setCalStatus('error'))
   }, [isOpen])
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
   const setView = (v: 'weekly' | 'monthly') => {
     setDefaultView(v)
-    localStorage.setItem('default-view', v)
   }
 
   const setWeekStartDay = (v: 'mon' | 'sun') => {
     setWeekStart(v)
-    localStorage.setItem('week-start', v)
   }
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark'
     setTheme(next)
-    localStorage.setItem('theme', next)
     document.documentElement.setAttribute('data-theme', next)
   }
 
   const handleAutoFeedbackToggle = () => {
-    const next = !autoFeedback
-    setAutoFeedback(next)
-    localStorage.setItem('ai-auto-feedback', next ? 'true' : 'false')
+    setAutoFeedback(prev => !prev)
   }
 
   const handleDataTypeToggle = (type: string) => {
-    const next = feedbackDataTypes.includes(type)
-      ? feedbackDataTypes.filter(t => t !== type)
-      : [...feedbackDataTypes, type]
-    setFeedbackDataTypes(next)
-    localStorage.setItem('ai-feedback-data-types', JSON.stringify(next))
+    setFeedbackDataTypes(prev =>
+      prev.includes(type)
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    )
   }
 
   if (!isOpen) return null
