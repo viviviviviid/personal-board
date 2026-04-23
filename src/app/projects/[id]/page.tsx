@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { format, addDays } from 'date-fns'
 import { ChevronLeft, ChevronDown, ChevronRight, Plus, Check, X, Target, Trash2, Pencil, Calendar, AlertCircle, MoreHorizontal } from 'lucide-react'
+import { useKeyboardInput } from '@/hooks/useKeyboardInput'
+import { useScrollLock } from '@/hooks/useScrollLock'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import AIPanel from '@/components/AIPanel'
 
 interface Todo {
@@ -43,19 +46,6 @@ const PRIORITY_COLOR: Record<string, string> = {
   high: '#a85848',
   medium: '#c4935a',
   low: '#95a586',
-}
-
-// ── IME-safe Enter handler ──────────────────────────────────────────────────
-function useImeInput(onSubmit: () => void, onCancel: () => void) {
-  const isComposing = useRef(false)
-  return {
-    onCompositionStart: () => { isComposing.current = true },
-    onCompositionEnd: () => { isComposing.current = false },
-    onKeyDown: (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !isComposing.current) { e.preventDefault(); onSubmit() }
-      if (e.key === 'Escape') onCancel()
-    },
-  }
 }
 
 // ── TodoItem ────────────────────────────────────────────────────────────────
@@ -100,7 +90,7 @@ function TodoItem({
     setEditing(false)
   }
 
-  const imeProps = useImeInput(submit, cancel)
+  const { handlers, onKeyDown } = useKeyboardInput()
 
   if (editing) {
     return (
@@ -111,7 +101,8 @@ function TodoItem({
             type="text"
             value={editTitle}
             onChange={e => setEditTitle(e.target.value)}
-            {...imeProps}
+            onKeyDown={(e) => onKeyDown(e, { submit, cancel })}
+            {...handlers}
             className="flex-1 bg-transparent text-sm focus:outline-none"
             style={{ borderBottom: '1px solid var(--accent-dim)', color: 'var(--text)' }}
             autoFocus
@@ -265,7 +256,7 @@ function AddTodoInline({
     onClose()
   }
 
-  const imeProps = useImeInput(submit, cancel)
+  const { handlers, onKeyDown } = useKeyboardInput()
 
   const isActive = addingFor === forKey
 
@@ -303,7 +294,8 @@ function AddTodoInline({
           type="text"
           value={title}
           onChange={e => setTitle(e.target.value)}
-          {...imeProps}
+          onKeyDown={(e) => onKeyDown(e, { submit, cancel })}
+          {...handlers}
           placeholder="할일 이름..."
           className="flex-1 bg-transparent py-0.5 text-sm focus:outline-none"
           style={{ borderBottom: '1px solid var(--accent-dim)', color: 'var(--text)' }}
@@ -365,7 +357,7 @@ function SectionHeader({
     setEditTitle(section.title)
     setEditing(false)
   }
-  const imeProps = useImeInput(submit, cancel)
+  const { handlers, onKeyDown } = useKeyboardInput()
 
   return (
     <div
@@ -386,7 +378,8 @@ function SectionHeader({
             type="text"
             value={editTitle}
             onChange={e => setEditTitle(e.target.value)}
-            {...imeProps}
+            onKeyDown={(e) => onKeyDown(e, { submit, cancel })}
+            {...handlers}
             className="flex-1 bg-transparent text-sm font-medium focus:outline-none"
             style={{ borderBottom: '1px solid var(--accent-dim)', color: 'var(--text)' }}
             autoFocus
@@ -466,6 +459,11 @@ export default function ProjectDetailPage() {
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
+
+  const isMobileFormOpen = isMobile && (addingFor !== CLOSED || addingSectionTitle)
+  useScrollLock(isMobileFormOpen)
+  const { containerRef: todoFormRef } = useFocusTrap(isMobile && addingFor !== CLOSED)
+  const { containerRef: sectionFormRef } = useFocusTrap(isMobile && addingSectionTitle)
 
   const deleteProject = async () => {
     try {
@@ -834,6 +832,8 @@ export default function ProjectDetailPage() {
       {/* 모바일 할일 추가 바텀 시트 */}
       {isMobile && addingFor !== CLOSED && (
         <div
+          ref={todoFormRef}
+          role="dialog"
           style={{
             position: 'fixed',
             left: 0,
@@ -904,6 +904,8 @@ export default function ProjectDetailPage() {
       {/* 모바일 섹션 추가 바텀 시트 */}
       {isMobile && addingSectionTitle && (
         <div
+          ref={sectionFormRef}
+          role="dialog"
           style={{
             position: 'fixed',
             left: 0,
