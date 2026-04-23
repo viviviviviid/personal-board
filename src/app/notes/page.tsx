@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Pin, Plus, Search, Trash2, ChevronLeft, X, Tag, Calendar, Lock, Eye, EyeOff, Copy, Check, Shield } from 'lucide-react'
+import { useKeyboardInput } from '@/hooks/useKeyboardInput'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import NoteEditor from '@/components/NoteEditor'
 import { parseTags, sanitizeTag, serializeTags, noteDisplayTitle, matchesSearch } from '@/lib/noteUtils'
 import { deriveKey, encryptText, decryptText, randomSaltHex } from '@/lib/vaultCrypto'
 import { VaultRow, VaultContent, newRowId, parseContent, serializeContent } from '@/lib/vaultContent'
 import { useVaultKey } from '@/context/VaultContext'
+import { STORAGE_KEYS } from '@/lib/storageKeys'
 
 interface Note {
   id: string
@@ -130,12 +133,28 @@ export default function NotesPage() {
     maybePurgeEmpty()
     clearTimeout(saveTimer.current)
     setSelected(note)
-    setDraft({
-      title: note.title ?? '',
-      content: note.content,
-      tags: note.tags ?? '',
-      date: note.date ?? '',
-    })
+    // Restore draft from localStorage if it exists
+    const storageKey = `${STORAGE_KEYS.NOTE_EDITING_PREFIX}${note.id}`
+    const savedDraft = localStorage.getItem(storageKey)
+    if (savedDraft) {
+      try {
+        setDraft(JSON.parse(savedDraft))
+      } catch {
+        setDraft({
+          title: note.title ?? '',
+          content: note.content,
+          tags: note.tags ?? '',
+          date: note.date ?? '',
+        })
+      }
+    } else {
+      setDraft({
+        title: note.title ?? '',
+        content: note.content,
+        tags: note.tags ?? '',
+        date: note.date ?? '',
+      })
+    }
     setShowEditor(true)
   }
 
@@ -162,6 +181,11 @@ export default function NotesPage() {
   const scheduleSave = (newDraft: typeof draft) => {
     clearTimeout(saveTimer.current)
     if (!newDraft.content.trim() && !newDraft.title.trim()) return
+    // Save draft to localStorage for recovery
+    if (selected) {
+      const storageKey = `${STORAGE_KEYS.NOTE_EDITING_PREFIX}${selected.id}`
+      localStorage.setItem(storageKey, JSON.stringify(newDraft))
+    }
     saveTimer.current = setTimeout(async () => {
       if (!selected) return
       setSaving(true)
@@ -179,6 +203,9 @@ export default function NotesPage() {
         const updated = await res.json()
         setSelected(updated)
         setNotes(prev => prev.map(n => n.id === updated.id ? updated : n))
+        // Clear localStorage after successful save
+        const storageKey = `${STORAGE_KEYS.NOTE_EDITING_PREFIX}${selected.id}`
+        localStorage.removeItem(storageKey)
       }
       setSaving(false)
     }, 1500)
@@ -213,6 +240,9 @@ export default function NotesPage() {
     const res = await fetch(`/api/notes/${selected.id}`, { method: 'DELETE' })
     if (res.ok) {
       setNotes(prev => prev.filter(n => n.id !== selected.id))
+      // Clear localStorage for deleted note
+      const storageKey = `${STORAGE_KEYS.NOTE_EDITING_PREFIX}${selected.id}`
+      localStorage.removeItem(storageKey)
       setSelected(null)
       setShowEditor(false)
       setShowDeleteConfirm(false)
@@ -920,21 +950,27 @@ export default function NotesPage() {
                   </span>
                 ))}
                 {showTagInput ? (
-                  <input
-                    autoFocus
-                    value={tagInput}
-                    onChange={e => setTagInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.nativeEvent.isComposing) addTag()
-                      if (e.key === 'Escape') { setShowTagInput(false); setTagInput('') }
-                    }}
-                    onBlur={() => { addTag(); setShowTagInput(false) }}
-                    placeholder="태그 입력"
-                    style={{
-                      width: 80, padding: '2px 6px', borderRadius: 7, border: '1px solid var(--accent)',
-                      background: 'var(--bg-input)', color: 'var(--text)', fontSize: 11, outline: 'none',
-                    }}
-                  />
+                  {(() => {
+                    const { handlers, onKeyDown } = useKeyboardInput()
+                    return (
+                      <input
+                        autoFocus
+                        value={tagInput}
+                        onChange={e => setTagInput(e.target.value)}
+                        onKeyDown={e => onKeyDown(e, {
+                          submit: addTag,
+                          cancel: () => { setShowTagInput(false); setTagInput('') }
+                        })}
+                        {...handlers}
+                        onBlur={() => { addTag(); setShowTagInput(false) }}
+                        placeholder="태그 입력"
+                        style={{
+                          width: 80, padding: '2px 6px', borderRadius: 7, border: '1px solid var(--accent)',
+                          background: 'var(--bg-input)', color: 'var(--text)', fontSize: 11, outline: 'none',
+                        }}
+                      />
+                    )
+                  })()
                 ) : (
                   <button
                     onClick={() => setShowTagInput(true)}
