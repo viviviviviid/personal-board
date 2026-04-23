@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { useScrollLock } from '@/hooks/useScrollLock'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface Props {
   open: boolean
@@ -16,6 +17,7 @@ export default function UpgradeModal({ open, onClose, reason }: Props) {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'yearly'>('yearly')
 
   useScrollLock(open)
+  const { containerRef } = useFocusTrap(open)
 
   if (!open) return null
 
@@ -38,6 +40,8 @@ export default function UpgradeModal({ open, onClose, reason }: Props) {
       onClick={onClose}
     >
       <div
+        ref={containerRef}
+        role="dialog"
         className="bg-[var(--bg-card)] rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >

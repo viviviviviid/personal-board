@@ -7,6 +7,7 @@ import { X, LogOut, Calendar, Sun, Moon } from 'lucide-react'
 import UpgradeModal from '@/components/UpgradeModal'
 import { useUpgradeModal } from '@/hooks/useUpgradeModal'
 import { useScrollLock } from '@/hooks/useScrollLock'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { STORAGE_KEYS } from '@/lib/storageKeys'
 
@@ -113,6 +114,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { upgradeOpen, upgradeReason, triggerUpgrade, closeUpgrade } = useUpgradeModal()
 
   useScrollLock(isOpen)
+  const { containerRef } = useFocusTrap(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
@@ -162,7 +164,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       onClick={onClose}
     >
       <div
+        ref={containerRef}
         className="w-full md:max-w-md rounded-t-2xl md:rounded-2xl settings-slide-up"
+        role="dialog"
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border)',
