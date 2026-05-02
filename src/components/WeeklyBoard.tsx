@@ -782,14 +782,8 @@ export default function WeeklyBoard() {
       .filter(e => isSameDay(new Date(e.date), targetDay))
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
 
-    // 항상 맨 위(투두)부터 보이도록 시작
-    const timelineY = 0
-
-    // topSection 높이 + 타임라인 내 위치 = outer 스크롤 목표
-    const scrollTop = height + timelineY
-
     const timer = setTimeout(() => {
-      outer.scrollTo({ top: scrollTop, behavior: 'instant' as ScrollBehavior })
+      outer.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior })
     }, 30)
     return () => clearTimeout(timer)
   }, [currentWeekStart, mobileDay, loading])
@@ -1758,7 +1752,7 @@ export default function WeeklyBoard() {
         style={{ minWidth: 0, border: '1px solid var(--border)', overflowX: 'auto', overflowY: 'auto' }}
         onAnimationEnd={() => setSlideDir(null)}
       >
-        {/* ── 상단 고정: 헤더 + 하이라이트 + TO-DO ── */}
+        {/* ── 날짜 헤더만 sticky ── */}
         <div ref={topSectionRef} style={{ flexShrink: 0, position: 'sticky', top: 0, background: 'var(--bg-surface)', zIndex: 50 }}>
         <div style={{
           display: 'grid',
@@ -1820,6 +1814,17 @@ export default function WeeklyBoard() {
               </div>
             )
           })}
+
+        </div>{/* grid 끝 (헤더만) */}
+        </div>{/* sticky 끝 */}
+
+        {/* ── 하이라이트 + TO-DO: 스크롤 영역 ── */}
+        <div style={{ flexShrink: 0 }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: gridCols,
+          minWidth: gridMinWidth,
+        }}>
 
           {/* ── Highlight section ── */}
           <div />{/* 레이블 열 자리 채우기 — grid row 정렬을 위해 항상 출력 */}
@@ -1883,7 +1888,7 @@ export default function WeeklyBoard() {
                 ) : (
                   <div className="space-y-0" onClick={() => { setActiveTodoId(null); setEditingTodoId(null) }}>
                     {(() => {
-                      const MAX = 6
+                      const MAX = isMobile ? 4 : 6
                       const expanded = expandedTodoDays.has(dayKey)
                       const displayTodos = expanded ? dayTodos : dayTodos.slice(0, MAX)
                       const hiddenCount = dayTodos.length - MAX
@@ -1929,7 +1934,7 @@ export default function WeeklyBoard() {
                               />
                             ) : (
                               <span
-                                className="text-[12px] leading-snug flex-1 min-w-0 break-words cursor-pointer"
+                                className={`text-[12px] leading-snug flex-1 min-w-0 cursor-pointer ${isMobile ? "truncate" : "break-words"}`}
                                 style={{ color: todo.completed ? 'var(--text-dim)' : 'var(--text)', textDecoration: todo.completed ? 'line-through' : 'none' }}
                                 onClick={e => { e.stopPropagation(); startEditTodo(todo); setActiveTodoId(todo.id) }}
                               >
@@ -2090,13 +2095,13 @@ export default function WeeklyBoard() {
             )
           })}
 
-        </div>{/* grid 끝 (상단: 헤더+하이라이트+TODO) */}
-        </div>{/* 상단 고정 컨테이너 끝 */}
+        </div>{/* grid 끝 (하이라이트+TODO) */}
+        </div>{/* 스크롤 영역 끝 */}
 
-        {/* ── 하단 독립 스크롤: 타임라인 ── */}
+        {/* ── 타임라인 ── */}
         <div
           ref={gridScrollRef}
-          style={{ flex: 1, minHeight: 0, overflowX: 'clip', overscrollBehavior: 'contain' }}
+          style={{ overflowX: 'clip', overscrollBehavior: 'contain' }}
         >
         <div style={{
           display: 'grid',
