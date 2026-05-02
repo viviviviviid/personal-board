@@ -2121,32 +2121,6 @@ export default function WeeklyBoard() {
             </span>
           </div>
 
-          {/* ── Timeline date headers ── */}
-          <div style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-dim)', position: 'sticky', top: topSectionHeight + 24, zIndex: 4 }} />
-          {visibleDays.map(day => {
-            const dKey = format(day, 'yyyy-MM-dd')
-            const td = isToday(day)
-            const dwi = dayOfWeekIdx(day)
-            return (
-              <div
-                key={`tl-hdr-${dKey}`}
-                className="flex items-center justify-center gap-1 py-1"
-                style={{
-                  background: td ? 'rgba(139, 92, 246, 0.08)' : 'var(--bg-surface)',
-                  borderLeft: '1px solid var(--border)',
-                  borderBottom: '1px solid var(--border-dim)',
-                  position: 'sticky', top: topSectionHeight + 24, zIndex: 2,
-                }}
-              >
-                <span className="text-[10px] font-semibold" style={{ color: td ? 'var(--accent)' : dwi >= 5 ? 'var(--text-muted)' : 'var(--text-dim)' }}>
-                  {DAYS_KO[dwi]}
-                </span>
-                <span className="text-[10px] font-medium" style={{ color: td ? 'var(--accent-light)' : 'var(--text-dim)' }}>
-                  {format(day, 'd')}
-                </span>
-              </div>
-            )
-          })}
 
           {/* ── All-day events row ── */}
           {visibleDays.some(day => allDayGoogleEventsForDay(day).length > 0) && (
@@ -2155,7 +2129,6 @@ export default function WeeklyBoard() {
                 style={{ background: 'var(--bg-surface)', borderRight: '1px solid var(--border)', borderBottom: '1px solid var(--border-rule)', minHeight: 28 }}
                 className="flex items-center gap-2 px-3 whitespace-nowrap"
               >
-                <div className="w-1 h-1 rounded-full flex-shrink-0" style={{ background: 'var(--accent-dim)' }} />
                 <span className="text-[9px] tracking-[0.2em] font-semibold uppercase" style={{ color: 'var(--text-dim)' }}>종일</span>
               </div>
               {visibleDays.map(day => {
